@@ -1,0 +1,224 @@
+---
+title: "1 - Database IPBS_ggm"
+author: "Arturo Bertero"
+date: "2023-10-09"
+output: html_document
+---
+
+# Libraries
+
+```{r}
+#packages
+library("pacman")
+p_load(tidyverse, here, sjlabelled, stringr, glue, janitor, haven, stargazer, 
+       ltm, skimr, readxl, naniar)
+
+#remove scientific notation
+options(scipen=999)
+```
+
+# Input
+
+```{r}
+#Load original data
+
+#response_original =  read_dta(here("Input", "v1.0_ResPOnsE_COVID_19_W1-W5.dta"))  %>% 
+#  clean_names()
+
+#saveRDS for github
+#saveRDS(response_original, here("Input", "v1.0_ResPOnsE_COVID_19_W1-W5.rds"))
+
+#Load data as rds
+response_original = read_rds(here("Input", "v1.0_ResPOnsE_COVID_19_W1-W5.rds"))
+```
+
+# Processing
+
+## Structure of missing W5: 20 October to 15 December 2022
+
+```{r}
+#Select variables
+W5 = response_original %>% 
+    filter(info_wave==5) %>% 
+     dplyr::select(c(s1,s2,s9,k1,k6,k2,k3_01,k3_02,k3_03,k3_04,k3_05,pe7_01,
+                     pe7_02,pe7_03,pe7_04,t1,t2,t3,t4_2,t5,t6,pe10,pe11,ukr_14)) %>% 
+        mutate(across(s1:ukr_14, ~replace(., .>97 , NA))) %>% 
+        mutate(k6 = replace(k6, k6>14, NA)) 
+
+#missing map
+vis_miss(W5) #70% present
+```
+
+## IPBS data
+
+```{r}
+IPBS = response_original %>% 
+    filter(info_wave==5) %>% 
+     dplyr::select(c(s1,s2,s9,k1,k6,k2,k3_01,k3_02,k3_03,k3_04,k3_05,pe7_01,
+                     pe7_02,pe7_03,pe7_04,t1,t2,t3,t4_2,t5,t6,pe10,pe11,ukr_14)) %>% 
+        mutate(across(s1:ukr_14, ~replace(., .>97 , NA))) %>% # 98 = NA
+        mutate(k6 = replace(k6, k6>13, NA), #no vote = NA
+               s1 = replace(s1, s1>2, NA)) %>%  #sex = 3 = NA
+        na.omit()
+
+#colnames
+colnames(IPBS) = c(
+"sex","age","educ","pol_int","vote","L_R","PTV_PD",
+"PTV_FI","PTV_L", "PTV_M5S","PTV_FDI","step_c_a","abortion","euth","omosex_m",
+"redis","flat_tax","min_wage","cit_inc","glob","immigration","big_gov",
+"pub_vs_priv","weapons_ukr")
+
+#Recode polarity: for everything but sociodem high values = endorsment 
+#of that issue
+IPBS = IPBS %>% 
+  mutate(sex = ifelse(sex==2, 0, 1),
+         across(pol_int, ~ 5 - .),
+         across(abortion, ~ 5 - .),
+         across(weapons_ukr,  ~ 5 - .))
+
+#Recode as factors 
+IPBS = IPBS %>%
+  mutate(sex = case_when(sex==0 ~ "Female",
+                         sex==1 ~ "Male"),
+         educ_cat = case_when(educ<=6 ~ "Less than university",
+                          educ>6 ~ "Degree or more"), 
+         pol_int_cat = case_when(pol_int==1 ~ "Low",
+                             pol_int==2 ~ "Medium-low",
+                             pol_int==3 ~ "Medium-high",
+                             pol_int==4 ~ "High"), 
+         vote_cat = case_when(
+                          vote==2 | vote==3 | vote==5 | vote==11 ~ "Dx",
+                          vote==4 ~ "M5S",
+                          vote==1 | vote==6 | vote==7 | vote==10 ~ "Sin",
+                          vote==8 | vote==9 | vote==12 ~ "Other")) 
+
+#Reorder dataset
+IPBS = IPBS %>% 
+  dplyr::select(c(
+"L_R","PTV_PD","PTV_FI","PTV_L","PTV_M5S","PTV_FDI", #symbolic comp
+"step_c_a","abortion","euth","omosex_m", #ethics
+"redis","flat_tax","min_wage","cit_inc","glob","immigration","big_gov",
+"pub_vs_priv","weapons_ukr", #issues
+"vote_cat","sex","age","educ_cat", 
+"pol_int", "pol_int_cat" #sociodem/predictors
+))
+
+#Stargazer
+#stargazer(as.data.frame(IPBS), type = "text", nobs = TRUE)
+```
+
+### Partitions of IPBS according to different metrics
+
+#### By vote
+
+```{r}
+#Select and listwise
+IPBS_vote = IPBS %>% 
+  dplyr::select(L_R:weapons_ukr,
+         vote_cat) %>% 
+  na.omit()
+
+#Split
+IPBS_vote = IPBS_vote %>% 
+  group_split(vote_cat, .keep = FALSE)
+
+vote_right = IPBS_vote[[1]] #359
+vote_M5S = IPBS_vote[[2]] #195
+vote_left = IPBS_vote[[4]] #450
+
+#descriptives
+#stargazer(as.data.frame(vote_left), type = "text", nobs = TRUE)
+#stargazer(as.data.frame(vote_M5S), type = "text", nobs = TRUE)
+#stargazer(as.data.frame(vote_right), type = "text", nobs = TRUE)
+```
+
+#### By pol_int
+
+```{r}
+#Pint in 3
+
+#Select and listwise
+IPBS_pol_int = IPBS %>% 
+  dplyr::select(L_R:weapons_ukr,
+         pol_int) %>% 
+  na.omit()
+
+#Split
+IPBS_pol_int = IPBS_pol_int %>% 
+  group_split(pol_int, .keep = FALSE)
+
+pol_int_low = IPBS_pol_int[[1]]  #49
+pol_int_midlow = IPBS_pol_int[[2]] #228
+
+#I create this one in case the network for int_low is too unstable
+polint_low_and_midlow = pol_int_low %>% 
+  bind_rows(pol_int_midlow) #277
+
+pol_int_midhigh = IPBS_pol_int[[3]] #634
+pol_int_high = IPBS_pol_int[[4]] #238
+
+#Pint in 2[1]
+polint_2_1_l = polint_low_and_midlow #high: 872
+polint_2_1_h = pol_int_midhigh %>% 
+  bind_rows(pol_int_high) #low: 277
+
+#Pint in 2[2]
+polint_2_2_l = polint_low_and_midlow %>% 
+  bind_rows(pol_int_midhigh) #low: 911
+polint_2_2_h = pol_int_high #high: 238
+
+#descriptives
+#stargazer(as.data.frame(polint_low_and_midlow), type = "text", nobs = TRUE)
+#stargazer(as.data.frame(pol_int_midhigh), type = "text", nobs = TRUE)
+#stargazer(as.data.frame(pol_int_high), type = "text", nobs = TRUE)
+```
+
+
+#### By educ
+
+```{r}
+#Select and listwise
+IPBS_educ = IPBS %>% 
+  dplyr::select(L_R:weapons_ukr,
+         educ_cat) %>% 
+    na.omit()
+
+#Split
+IPBS_educ = IPBS_educ %>% 
+  group_split(educ_cat, .keep = FALSE)
+
+educ_low = IPBS_educ[[2]]  #low: 706
+educ_high = IPBS_educ[[1]] #high: 443
+
+#descriptives
+#stargazer(as.data.frame(educ_low), type = "text", nobs = TRUE)
+#stargazer(as.data.frame(educ_high), type = "text", nobs = TRUE)
+```
+
+
+# Output
+```{r}
+#Save IPBS
+saveRDS(IPBS, here("Input", "IPBS.rds"))
+
+#Save vote partitions
+save(vote_left,vote_M5S,vote_right,
+     file = here("Input", "Partitions", "vote_partitions.RData"))
+
+#Save pol_int partitions
+save(polint_low_and_midlow,pol_int_midhigh,pol_int_high, 
+     file = here("Input", "Partitions", "pol_int_partitions.RData"))
+
+#Save pol_int_2_1
+save(polint_2_1_l,polint_2_1_h, 
+     file = here("Input", "Partitions", "pol_int_partitions_2_1.RData"))
+
+#Save pol_int_2_2
+save(polint_2_2_l,polint_2_2_h, 
+     file = here("Input", "Partitions", "pol_int_partitions_2_2.RData"))
+
+#Save educ partitions
+save(educ_low,educ_high, 
+     file = here("Input", "Partitions", "educ_partitions.RData"))
+```
+
