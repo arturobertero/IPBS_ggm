@@ -26,26 +26,18 @@ p_load(tidyverse, here, sjlabelled, stringr, glue, EGAnet, janitor, haven,
 #Load data
 IPBS = readRDS((here("Input", "IPBS.rds")))
 
-#Filter smaller datasets
-PTVs = IPBS %>% 
-  dplyr::select(c(PTV_PD:PTV_FDI))
-
-PTV_LR = IPBS %>% 
-  dplyr::select(c(L_R:PTV_FDI))
-
+#Filter smaller dataset
 att = IPBS %>% 
   dplyr::select(c(L_R:weapons_ukr)) 
-
-all = IPBS %>% 
-  dplyr::select(c(L_R:vote))
 
 #Partitions
 load(file = here("Input", "Partitions", "pol_int_partitions.RData"))
 load(file = here("Input", "Partitions", "pol_int_partitions_2_1.RData"))
 load(file = here("Input", "Partitions", "pol_int_partitions_2_2.RData"))
 load(file = here("Input", "Partitions", "educ_partitions.RData"))
+load(file = here("Input", "Partitions", "vote_partitions.RData"))
 
-#Fast running (run [0] or skip [1] bootnet)
+#Fast running (run [0] or skip [1] bootnet and NCT)
 fast_running = 1
 ```
 
@@ -67,7 +59,7 @@ Totalgroup_comm <- list(
  "Symbolic"=c(1:6),
  "Operational"=c(7:19))
 
-Totalgroup_cols <- c("#E96479","#3FA796")
+Totalgroup_cols <- c("#A63F96","#3FA796")
 
 #remove labels
 att = sapply(att, haven::zap_labels)
@@ -93,7 +85,7 @@ Graph_att = qgraph(att_net,
   cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
   groups=Totalgroup_comm, color=Totalgroup_cols,
   legend = TRUE, legend.cex = 0.40, borders = FALSE,
-  filetype="jpg", filename=here("Output", "GGM", "mgm_att"))
+  filetype="jpg", filename=here("Output", "Article", "Figure_1"))
 ```
 
 ## Estimation by levels of polint
@@ -116,14 +108,13 @@ pint_l_data_net = cor_auto(pint_l_data, npn.SKEPTIC = T,
 pint_l_data_net = EBICglasso(S = pint_l_data_net, n = nrow(pint_l_data))
 
 #plot
-#set.seed(1)
-#Graph_pint_l = qgraph(pint_l_data_net,
-#  layout = "spring", theme = "Borkulo", 
-#  labels = shortnames, nodeNames = longnames,
-#  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
-#  groups=Totalgroup_comm, color=Totalgroup_cols,
-#  legend = TRUE, legend.cex = 0.40, borders = FALSE,
-#  filetype="jpg", filename=here("Output", "GGM", "ggm_pint_l"))
+set.seed(1)
+Graph_pint_l = qgraph(pint_l_data_net,
+  layout = "spring", theme = "Borkulo", title = "Political interest - Low",
+  labels = shortnames, nodeNames = longnames,
+  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  groups=Totalgroup_comm, color=Totalgroup_cols,
+  legend = FALSE, borders = FALSE)
 
 #Fit GGM pint_h_data
 pint_h_data_net = cor_auto(pint_h_data, npn.SKEPTIC = T, 
@@ -135,14 +126,40 @@ pint_h_data_net = cor_auto(pint_h_data, npn.SKEPTIC = T,
 pint_h_data_net = EBICglasso(S = pint_h_data_net, n = nrow(pint_h_data))
 
 #plot
-#set.seed(1)
-#Graph_pint_h = qgraph(pint_h_data_net,
-#  layout = "spring", theme = "Borkulo", 
-#  labels = shortnames, nodeNames = longnames,
-#  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
-#  groups=Totalgroup_comm, color=Totalgroup_cols,
-#  legend = TRUE, legend.cex = 0.40, borders = FALSE,
-#  filetype="jpg", filename=here("Output", "GGM", "ggm_pint_h"))
+set.seed(1)
+Graph_pint_h = qgraph(pint_h_data_net,
+  layout = "spring", theme = "Borkulo", title = "Political interest - High",
+  labels = shortnames, nodeNames = longnames,
+  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  groups=Totalgroup_comm, color=Totalgroup_cols,
+  legend = FALSE, borders = FALSE)
+
+#multiplot
+jpeg(here("Output", "Supplement", "Fig_1.jpg"), 
+    height = 500, width = 1200, quality = 100)
+
+L<-averageLayout(Graph_pint_l,Graph_pint_h, layout = "spring")
+lmat <- matrix(1:2, 1)
+lo <- layout(lmat, width = c(1, 1))
+
+#plot
+set.seed(1)
+Graph_pint_l = qgraph(pint_l_data_net,
+  layout = L, theme = "Borkulo", title = "Political interest - Low",
+  labels = shortnames, nodeNames = longnames,
+  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  groups=Totalgroup_comm, color=Totalgroup_cols,
+  legend = FALSE, borders = FALSE)
+
+set.seed(1)
+Graph_pint_h = qgraph(pint_h_data_net,
+  layout = L, theme = "Borkulo", title = "Political interest - High",
+  labels = shortnames, nodeNames = longnames,
+  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  groups=Totalgroup_comm, color=Totalgroup_cols,
+  legend = FALSE, borders = FALSE)
+
+dev.off()
 ```
 
 ## Estimation by levels of educ
@@ -161,14 +178,13 @@ educ_l_data_net = cor_auto(educ_l_data, npn.SKEPTIC = T,
 educ_l_data_net = EBICglasso(S = educ_l_data_net, n = nrow(educ_l_data))
 
 #plot
-#set.seed(1)
-#Graph_educ_l = qgraph(educ_l_data_net,
-#  layout = "spring", theme = "Borkulo", 
-#  labels = shortnames, nodeNames = longnames,
-#  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
-#  groups=Totalgroup_comm, color=Totalgroup_cols,
-#  legend = TRUE, legend.cex = 0.40, borders = FALSE,
-#  filetype="jpg", filename=here("Output", "GGM", "ggm_educ_l"))
+set.seed(1)
+Graph_educ_l = qgraph(educ_l_data_net,
+  layout = "spring", theme = "Borkulo", 
+  labels = shortnames, nodeNames = longnames,
+  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  groups=Totalgroup_comm, color=Totalgroup_cols,
+  legend = FALSE, borders = FALSE)
 
 #Fit GGM educ_h_data
 educ_h_data_net = cor_auto(educ_h_data, npn.SKEPTIC = T, 
@@ -180,60 +196,135 @@ educ_h_data_net = cor_auto(educ_h_data, npn.SKEPTIC = T,
 educ_h_data_net = EBICglasso(S = educ_h_data_net, n = nrow(educ_h_data))
 
 #plot
-#set.seed(1)
-#Graph_educ_h = qgraph(educ_h_data_net,
-#  layout = "spring", theme = "Borkulo", 
-#  labels = shortnames, nodeNames = longnames,
-#  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
-#  groups=Totalgroup_comm, color=Totalgroup_cols,
-#  legend = TRUE, legend.cex = 0.40, borders = FALSE,
-#  filetype="jpg", filename=here("Output", "GGM", "ggm_educ_h"))
+set.seed(1)
+Graph_educ_h = qgraph(educ_h_data_net,
+  layout = "spring", theme = "Borkulo", 
+  labels = shortnames, nodeNames = longnames,
+  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  groups=Totalgroup_comm, color=Totalgroup_cols,
+  legend = FALSE, borders = FALSE)
+
+#multiplot
+jpeg(here("Output", "Supplement", "Fig_2.jpg"), 
+    height = 500, width = 1200, quality = 100)
+
+L<-averageLayout(Graph_educ_l,Graph_educ_h, layout = "spring")
+lmat <- matrix(1:2, 1)
+lo <- layout(lmat, width = c(1, 1))
+
+set.seed(1)
+Graph_educ_l = qgraph(educ_l_data_net,
+  layout = L, theme = "Borkulo", title = "Education - Low",
+  labels = shortnames, nodeNames = longnames,
+  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  groups=Totalgroup_comm, color=Totalgroup_cols,
+  legend = FALSE, borders = FALSE)
+
+set.seed(1)
+Graph_educ_h = qgraph(educ_h_data_net,
+  layout = L, theme = "Borkulo", title = "Education - High",
+  labels = shortnames, nodeNames = longnames,
+  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  groups=Totalgroup_comm, color=Totalgroup_cols,
+  legend = FALSE, borders = FALSE)
+
+dev.off()
 ```
 
-## Network with behavior
+## Estimation by vote choice
 ```{r}
-#Objects
-shortnames_all = names(all)
-longnames_all = c("Left right","Propensity to vote for PD",
-              "Propensity to vote for FI","Propensity to vote for L",
-              "Propensity to vote for M5S","Propensity to vote for FDI",
-              "Step child adoption","Abortion","Euthanasia","Omosexual marriage",
-              "Redistribution","Flat tax","Minimum wage","Citizenship income",
-              "Globalization","Immigration","Big government",
-              "Public vs private","Weapons to Ukraine","Vote")
-Totalgroup_comm_all <- list(
- "Symbolic"=c(1:6),
- "Operational"=c(7:19),
- "Behavior"= 20)
-Totalgroup_cols_all <- c("#E96479","#3FA796","#C3ACD0")
-
 #data
-all = sapply(all, haven::zap_labels) 
+vote_l_data = sapply(vote_left, haven::zap_labels) 
+vote_m_data = sapply(vote_M5S, haven::zap_labels)
+vote_r_data = sapply(vote_right, haven::zap_labels)
 
-#declare operational or symbolic (H2)
-nature_all = c(rep("Symbolic", 6),
-            rep("Operational", 13),
-            "Vote")
-
-#Fit GGM att_net
-all_net = cor_auto(all, npn.SKEPTIC = T, #Nonparanormal transformation (HUGE)
-                        ordinalLevelMax = 7, #from keskinturk
+#Fit GGM vote_l_data
+vote_l_data_net = cor_auto(vote_l_data, npn.SKEPTIC = T, 
+                        ordinalLevelMax = 7, 
                         forcePD = TRUE,
                         missing = "pairwise",
                         verbose = FALSE)
 
-all_net = EBICglasso(S = all_net, n = nrow(all))
+vote_l_data_net = EBICglasso(S = vote_l_data_net, n = nrow(vote_l_data))
 
 #plot
 set.seed(1)
-Graph_all = qgraph(all_net,
+Graph_vote_l = qgraph(vote_l_data_net,
   layout = "spring", theme = "Borkulo", 
-  labels = shortnames_all, nodeNames = longnames_all,
+  labels = shortnames, nodeNames = longnames,
   cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
-  groups=Totalgroup_comm_all, color=Totalgroup_cols_all,
-  legend = TRUE, legend.cex = 0.40, borders = FALSE,
-  filetype="jpg", filename=here("Output", "GGM", "mgm_all"))
+  groups=Totalgroup_comm, color=Totalgroup_cols,
+  legend = FALSE, borders = FALSE)
 
+#Fit GGM vote_m_data
+vote_m_data_net = cor_auto(vote_m_data, npn.SKEPTIC = T, 
+                        ordinalLevelMax = 7, 
+                        forcePD = TRUE,
+                        missing = "pairwise",
+                        verbose = FALSE)
+
+vote_m_data_net = EBICglasso(S = vote_m_data_net, n = nrow(vote_m_data))
+
+#plot
+set.seed(1)
+Graph_vote_m = qgraph(vote_m_data_net,
+  layout = "spring", theme = "Borkulo", 
+  labels = shortnames, nodeNames = longnames,
+  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  groups=Totalgroup_comm, color=Totalgroup_cols,
+  legend = FALSE, borders = FALSE)
+
+#Fit GGM vote_r_data
+vote_r_data_net = cor_auto(vote_r_data, npn.SKEPTIC = T, 
+                        ordinalLevelMax = 7, 
+                        forcePD = TRUE,
+                        missing = "pairwise",
+                        verbose = FALSE)
+
+vote_r_data_net = EBICglasso(S = vote_r_data_net, n = nrow(vote_r_data))
+
+#plot
+set.seed(1)
+Graph_vote_r = qgraph(vote_r_data_net,
+  layout = "spring", theme = "Borkulo", 
+  labels = shortnames, nodeNames = longnames,
+  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  groups=Totalgroup_comm, color=Totalgroup_cols,
+  legend = FALSE, borders = FALSE)
+
+#multiplot
+jpeg(here("Output", "Article", "Figure_3.jpg"), 
+    height = 700, width = 1400, quality = 100)
+
+L<-averageLayout(Graph_vote_l,Graph_vote_m, Graph_vote_r, layout = "spring")
+lmat <- matrix(1:3, 1)
+lo <- layout(lmat, width = c(1, 1))
+
+set.seed(1)
+Graph_vote_l = qgraph(vote_l_data_net,
+  layout = L, theme = "Borkulo", title = "Left",
+  labels = shortnames, nodeNames = longnames,
+  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  groups=Totalgroup_comm, color=Totalgroup_cols,
+  legend = FALSE, borders = FALSE)
+
+set.seed(1)
+Graph_vote_m = qgraph(vote_m_data_net,
+  layout = L, theme = "Borkulo", title = "M5S",
+  labels = shortnames, nodeNames = longnames,
+  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  groups=Totalgroup_comm, color=Totalgroup_cols,
+  legend = FALSE, borders = FALSE)
+
+set.seed(1)
+Graph_vote_r = qgraph(vote_r_data_net,
+  layout = L, theme = "Borkulo", title = "Right",
+  labels = shortnames, nodeNames = longnames,
+  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  groups=Totalgroup_comm, color=Totalgroup_cols,
+  legend = FALSE, borders = FALSE)
+
+dev.off()
 ```
 
 ## Bootstrap analyses
@@ -248,6 +339,7 @@ if (fast_running==0) {
 #boots_att
 boot_att = zap_labels(att) %>%
           data.frame()
+
 df.boot_att = bootnet(boot_att, nBoots = 10000, nCores = 8,
                      default = "EBICglasso", type = "nonparametric", model = "GGM",
                      corMethod = "cor_auto", corArgs = list(
@@ -256,26 +348,9 @@ df.boot_att = bootnet(boot_att, nBoots = 10000, nCores = 8,
                         forcePD = TRUE,
                         missing = "pairwise",
                         verbose = FALSE),
-                     statistics = c("strength", "bridgeCloseness", 
-                     "bridgeBetweenness"), computeCentrality = TRUE)
+                     statistics = c("strength"), computeCentrality = TRUE)
 #Save Bootnets
 save(df.boot_att, file = here("Input", "Boots", "boots_att.RData"))
-
-#boots_all
-boot_all = zap_labels(all) %>%
-          data.frame()
-df.boot_all = bootnet(boot_all, nBoots = 10000, nCores = 8,
-                     default = "EBICglasso", type = "nonparametric", model = "GGM",
-                     corMethod = "cor_auto", corArgs = list(
-                        npn.SKEPTIC = T,
-                        ordinalLevelMax = 7, 
-                        forcePD = TRUE,
-                        missing = "pairwise",
-                        verbose = FALSE),
-                     statistics = c("strength", "bridgeCloseness", 
-                     "bridgeBetweenness"), computeCentrality = TRUE)
-#Save Bootnets
-save(df.boot_all, file = here("Input", "Boots", "boots_all.RData"))
 
 ###############
 #Bootstrap pint
@@ -292,8 +367,7 @@ df.boot_pint_l <- bootnet(polint_low_and_midlow, nBoots = 10000, nCores = 8,
                         forcePD = TRUE,
                         missing = "pairwise",
                         verbose = FALSE),
-                     statistics = c("strength", "bridgeCloseness", 
-                     "bridgeBetweenness"), computeCentrality = TRUE)
+                     statistics = c("strength"), computeCentrality = TRUE)
 
 #mid
 pol_int_midhigh = zap_labels(pol_int_midhigh) %>%
@@ -306,8 +380,7 @@ df.boot_pint_m <- bootnet(pol_int_midhigh, nBoots = 10000, nCores = 8,
                         forcePD = TRUE,
                         missing = "pairwise",
                         verbose = FALSE),
-                     statistics = c("strength", "bridgeCloseness", 
-                     "bridgeBetweenness"), computeCentrality = TRUE)
+                     statistics = c("strength"), computeCentrality = TRUE)
 
 #high
 pol_int_high = zap_labels(pol_int_high) %>%
@@ -320,8 +393,7 @@ df.boot_pint_h <- bootnet(pol_int_high, nBoots = 10000, nCores = 8,
                         forcePD = TRUE,
                         missing = "pairwise",
                         verbose = FALSE),
-                     statistics = c("strength", "bridgeCloseness", 
-                     "bridgeBetweenness"), computeCentrality = TRUE)
+                     statistics = c("strength"), computeCentrality = TRUE)
 
 #Save Bootnets
 save(df.boot_pint_l,df.boot_pint_m,df.boot_pint_h,
@@ -342,8 +414,7 @@ df.boot_educ_l <- bootnet(educ_low, nBoots = 10000, nCores = 8,
                         forcePD = TRUE,
                         missing = "pairwise",
                         verbose = FALSE),
-                     statistics = c("strength", "bridgeCloseness", 
-                     "bridgeBetweenness"), computeCentrality = TRUE)
+                     statistics = c("strength"), computeCentrality = TRUE)
 
 #high
 educ_high = zap_labels(educ_high) %>%
@@ -356,8 +427,7 @@ df.boot_educ_h <- bootnet(educ_high, nBoots = 10000, nCores = 8,
                         forcePD = TRUE,
                         missing = "pairwise",
                         verbose = FALSE),
-                     statistics = c("strength", "bridgeCloseness", 
-                     "bridgeBetweenness"), computeCentrality = TRUE)
+                     statistics = c("strength"), computeCentrality = TRUE)
 
 #Save Bootnets
 save(df.boot_educ_l,df.boot_educ_h,
@@ -380,8 +450,7 @@ df.boot_pint_l_2_1 <- bootnet(polint_l_2_1, nBoots = 10000, nCores = 8,
                         forcePD = TRUE,
                         missing = "pairwise",
                         verbose = FALSE),
-                     statistics = c("strength", "bridgeCloseness", 
-                     "bridgeBetweenness"), computeCentrality = TRUE)
+                     statistics = c("strength"), computeCentrality = TRUE)
 
 #high
 polint_h_2_1 = zap_labels(polint_2_1_h) %>%
@@ -394,8 +463,7 @@ df.boot_pint_h_2_1 <- bootnet(polint_h_2_1, nBoots = 10000, nCores = 8,
                         forcePD = TRUE,
                         missing = "pairwise",
                         verbose = FALSE),
-                     statistics = c("strength", "bridgeCloseness", 
-                     "bridgeBetweenness"), computeCentrality = TRUE)
+                     statistics = c("strength"), computeCentrality = TRUE)
 
 #Save Bootnets
 save(df.boot_pint_l_2_1,df.boot_pint_h_2_1,
@@ -414,8 +482,7 @@ df.boot_pint_l_2_2 <- bootnet(polint_l_2_2, nBoots = 10000, nCores = 8,
                         forcePD = TRUE,
                         missing = "pairwise",
                         verbose = FALSE),
-                     statistics = c("strength", "bridgeCloseness", 
-                     "bridgeBetweenness"), computeCentrality = TRUE)
+                     statistics = c("strength"), computeCentrality = TRUE)
 
 #high
 polint_h_2_2 = zap_labels(polint_2_2_h) %>%
@@ -428,8 +495,7 @@ df.boot_pint_h_2_2 <- bootnet(polint_h_2_2, nBoots = 10000, nCores = 8,
                         forcePD = TRUE,
                         missing = "pairwise",
                         verbose = FALSE),
-                     statistics = c("strength", "bridgeCloseness", 
-                     "bridgeBetweenness"), computeCentrality = TRUE)
+                     statistics = c("strength"), computeCentrality = TRUE)
 
 #Save Bootnets
 save(df.boot_pint_l_2_2,df.boot_pint_h_2_2,
@@ -439,20 +505,49 @@ save(df.boot_pint_l_2_2,df.boot_pint_h_2_2,
   
   #Boots
 load(file = here("Input", "Boots", "boots_att.RData"))
-load(file = here("Input", "Boots", "boots_all.RData"))
 load(file = here("Input", "Boots", "boots_pint.RData"))
 load(file = here("Input", "Boots", "boots_educ.RData"))
 load(file = here("Input", "Boots", "boots_pint_2_1.RData"))
 load(file = here("Input", "Boots", "boots_pint_2_2.RData"))
 }
-
-#More boots
-
 ```
 
-### H1a, constraint hypothesis (cor network)
-The network of people with high political interest will have higher constraint 
-if compared to the one estimated on the low political interest sample.
+## NCT analyses
+```{r}
+if (fast_running==0) {
+
+#Right versus Movement
+NCT_r_m <- NCT(vote_right,vote_M5S, it = 10000,
+                test.edges = TRUE, edges = "all", 
+                test.centrality = FALSE)
+#Save 
+save(NCT_r_m, file = here("Input", "NCT", "NCT_r_m.RData"))
+
+#Left vs Right
+NCT_l_r <- NCT(vote_left,vote_right, it = 10000,
+                test.edges = TRUE, edges = "all", 
+                test.centrality = FALSE)
+#Save 
+save(NCT_l_r, file = here("Input", "NCT", "NCT_l_r.RData"))
+
+#Left vs Movement
+NCT_l_m <- NCT(vote_left,vote_M5S, it = 10000,
+                test.edges = TRUE, edges = "all", 
+                test.centrality = FALSE)
+#Save 
+save(NCT_l_m, file = here("Input", "NCT", "NCT_l_m.RData"))
+
+} else {
+  
+  #Boots
+load(file = here("Input", "NCT", "NCT_r_m.RData"))
+load(file = here("Input", "NCT", "NCT_l_r.RData"))
+load(file = here("Input", "NCT", "NCT_l_m.RData"))
+}
+```
+
+
+### H1 constraint hypothesis
 
 ```{r}
 #Extract boots_pint_l
@@ -523,7 +618,7 @@ cons_pint_h = mean_values
 ```
 
 ```{r}
-#Graph H1a
+#Graph H1
 # Create a vector pint
 pint = c(rep("Low", 10000), rep("Mid", 10000), rep("High", 10000))
 pint = factor(pint, levels=c("Low", "Mid", "High"))
@@ -543,7 +638,7 @@ mcon_pint_summary <- mcon_pint %>%
   )
 
 # Create the plot
-H1a <- ggplot() +
+H1 <- ggplot() +
   geom_violin(data = mcon_pint, aes(x = pint, y = const_val), 
               scale = "count", width = 0.6, alpha = 0.5, fill = "black") +
   geom_errorbar(data = mcon_pint_summary, aes(x = pint, ymin = ymin, ymax = ymax), 
@@ -551,13 +646,9 @@ H1a <- ggplot() +
   ylab("Average Constraint") +
   xlab("Political Interest") +
   theme(axis.title.x = element_text(), legend.position = "none")
-
-# Save the plot
-ggsave(here("Output", "GGM", "H1a.jpg"), H1a, width = 6, height = 4)
-
 ``` 
 
-### H1a 2_1
+### H1 2_1 (robustness)
 Replicate on pint with two levels to assess stability
 ```{r}
 #Extract boots_pint_l_2_1
@@ -629,22 +720,19 @@ mcon_pint_2_1_summary <- mcon_pint_2_1 %>%
   )
 
 # Create the plot
-H1a_2_1 <- ggplot() +
+H1_2_1 <- ggplot() +
   geom_violin(data = mcon_pint_2_1, aes(x = pint, y = const_val), 
               scale = "count", width = 0.6, alpha = 0.5, fill = "black") +
   geom_errorbar(data = mcon_pint_2_1_summary, aes(x = pint, ymin = ymin, ymax = ymax), 
                 width = 0.2, linewidth = 0.7, color = "black") +
   ylab("Average Constraint") +
-  xlab("Political Interest") +
+  xlab("Political Interest - Option 1") +
   theme(axis.title.x = element_text(), legend.position = "none")
-
-# Save the plot
-ggsave(here("Output", "GGM", "H1a_2_1.jpg"), H1a_2_1, width = 6, height = 4)
 
 ``` 
 
-### H1a 2_2
-Replicate on pint with two levels to assess stability
+### H1 2_2 (robustness)
+
 ```{r}
 #Extract boots_pint_l_2_2
 
@@ -715,23 +803,26 @@ mcon_pint_2_2_summary <- mcon_pint_2_2 %>%
   )
 
 # Create the plot
-H1a_2_2 <- ggplot() +
+H1_2_2 <- ggplot() +
   geom_violin(data = mcon_pint_2_2, aes(x = pint, y = const_val), 
               scale = "count", width = 0.6, alpha = 0.5, fill = "black") +
   geom_errorbar(data = mcon_pint_2_2_summary, aes(x = pint, ymin = ymin, ymax = ymax), 
                 width = 0.2, linewidth = 0.7, color = "black") +
   ylab("Average Constraint") +
-  xlab("Political Interest") +
+  xlab("Political Interest - Option 2") +
   theme(axis.title.x = element_text(), legend.position = "none")
+```
 
-# Save the plot
-ggsave(here("Output", "GGM", "H1a_2_2.jpg"), H1a_2_2, width = 6, height = 4)
 
-``` 
+```{r}
+#create multiplot
+Fig_3 = H1_2_1 / H1_2_2
 
-### H1b, rival constraint hypothesis (cor network)
-The network of people with high education will have higher connectivity if 
-compared to the one estimated on the low education sample.
+# Save the multiplot
+ggsave(here("Output", "Supplement", "Fig_3.jpg"), Fig_3, width = 7, height = 7)
+```
+
+### H2 rival constraint hypothesis
 
 ```{r}
 #Loop: extract boots_educ_l
@@ -773,7 +864,7 @@ cons_educ_h = mean_values
 ```
 
 ```{r}
-#Graph H1b
+#Graph H2
 # Create a vector educ
 educ = c(rep("Low", 10000), rep("High", 10000))
 educ = factor(educ, levels=c("Low", "High"))
@@ -793,7 +884,7 @@ mcon_edu_summary <- mcon_educ %>%
   )
 
 # Create the plot
-H1b <- ggplot() +
+H2 <- ggplot() +
   geom_violin(data = mcon_educ, aes(x = educ, y = const_val), 
               scale = "count", width = 0.6, alpha = 0.5, fill = "black") +
   geom_errorbar(data = mcon_edu_summary, aes(x = educ, ymin = ymin, ymax = ymax), 
@@ -802,192 +893,197 @@ H1b <- ggplot() +
   xlab("Education") +
   theme(axis.title.x = element_text(), legend.position = "none")
 
-ggsave(here("Output", "GGM", "H1b.jpg"), H1b, width = 6, height = 4) 
-
-```
-
-### H2, centrality hypothesis
-The mean centrality of symbolic variables will be higher than the mean 
-centrality of operational variables.
-
-```{r}
-# Strength data from the boots
-boots_att_strength = df.boot_att$bootTable %>% 
-  filter(type=="strength") %>% 
-  mutate(type = c(rep(nature, 10000))) %>% 
-  dplyr::select(c("value", "type"))
-  
-# Betweenness data from the boots
-boots_att_betweenness = df.boot_att$bootTable %>% 
-  filter(type=="bridgeBetweenness") %>% 
-  mutate(type = c(rep(nature, 10000))) %>% 
-  dplyr::select(c("value", "type"))
-
-# Closeness data from the boots
-boots_att_closeness = df.boot_att$bootTable %>% 
-  filter(type=="bridgeCloseness") %>% 
-  mutate(type = c(rep(nature, 10000))) %>% 
-  dplyr::select(c("value", "type")) %>% 
-  mutate(value=value*100)  #multiplied for 100 as in Brandt
 ```
 
 ```{r}
-# Calculate quantile-based confidence intervals (90% CI)
+#create multiplot
+Figure_2 = H1 / H2
 
-#strength
-strength_summary <- boots_att_strength %>%
-  group_by(type) %>%
-  summarise(
-    m = mean(value),
-    ymin = quantile(value, 0.025),  # 2.5 percentile, α=0.05 (α/2 = 0.025)
-    ymax = quantile(value, 0.975)   # 97.5 percentile, α=0.05 (1 - α/2 = 0.975)
-  )
-
-#betweenness
-betweenness_summary <- boots_att_betweenness %>%
-  group_by(type) %>%
-  summarise(
-    m = mean(value),
-    ymin = quantile(value, 0.025),  # 2.5 percentile, α=0.05 (α/2 = 0.025)
-    ymax = quantile(value, 0.975)   # 97.5 percentile, α=0.05 (1 - α/2 = 0.975)
-  )
-
-#closeness
-closeness_summary <- boots_att_closeness %>%
-  group_by(type) %>%
-  summarise(
-    m = mean(value),
-    ymin = quantile(value, 0.025),  # 2.5 percentile, α=0.05 (α/2 = 0.025)
-    ymax = quantile(value, 0.975)   # 97.5 percentile, α=0.05 (1 - α/2 = 0.975)
-  )
+# Save the multiplot
+ggsave(here("Output", "Article", "Figure_2.jpg"), Figure_2, width = 7, height = 7)
 ```
 
+### H3 heterogeneity hypothesis
+(from 3 - mgm_230912.RMD (old folder of old GGM proj))
 
 ```{r}
-#Strength
-H2_strength = ggplot() +
-  geom_violin(data = boots_att_strength, 
-              aes(x = type, y = value, fill = type, color = type), 
-              scale = "count", width = 0.6, alpha = 0.5, color = "transparent") +
-  geom_errorbar(data = strength_summary, aes(x = type, ymin = ymin, ymax = ymax), 
-                width = 0.2, linewidth = 0.7, color = "black") +
-  xlab(NULL) +  
-  ylab(NULL) +
-  scale_color_manual(values = c("Operational" = "#3FA796", "Symbolic" = "#E96479")) +
-  guides(fill = FALSE, color = FALSE) +
-  ggtitle("Strength")
-#save this one for the paper
-ggsave(here("Output", "GGM", "H2_strength.jpg"), H2_strength, width = 6, height = 4)
-```
+#Visualize results of edge tests 
 
-```{r}
-#betweenness
-H2_betweenness = ggplot() +
-  geom_violin(data = boots_att_betweenness, 
-              aes(x = type, y = value, fill = type, color = type), 
-              scale = "count", width = 0.6, alpha = 0.5, color = "transparent") +
-  geom_errorbar(data = betweenness_summary, aes(x = type, ymin = ymin, ymax = ymax), 
-                width = 0.2, linewidth = 0.7, color = "black") +
-  xlab(NULL) +  
-  ylab(NULL) +
-  scale_color_manual(values = c("Operational" = "#3FA796", "Symbolic" = "#E96479")) +
-  guides(fill = FALSE, color = FALSE) +
-  ggtitle("Betweenness")
+#r_m
+input_NCTgraph_r_m <- vote_r_data_net - vote_m_data_net
+input_NCTgraph_r_m[upper.tri(input_NCTgraph_r_m)][which(NCT_r_m$einv.pvals$`p-value` >= .05)] <- 0
+input_NCTgraph_r_m <- forceSymmetric(input_NCTgraph_r_m)
 
-#ggsave(here("Output", "GGM", "H2_betweenness.jpg"), H2_betweenness, width = 6, height = 4)
+nct_r_m = qgraph(input_NCTgraph_r_m, edge.labels = TRUE,
+                  layout = "spring", theme = "Borkulo", 
+                  labels = shortnames, nodeNames = longnames,
+                  groups=Totalgroup_comm, color= Totalgroup_cols,
+                  cut = 0.10, maximum = 1, 
+                  details = FALSE, vsize=6.0, 
+                  legend = FALSE, legend.cex = 0.35, borders = TRUE)
+
+#l_r
+input_NCTgraph_l_r <- vote_l_data_net - vote_r_data_net
+input_NCTgraph_l_r[upper.tri(input_NCTgraph_l_r)][which(NCT_l_r$einv.pvals$`p-value` >= .05)] <- 0
+input_NCTgraph_l_r <- forceSymmetric(input_NCTgraph_l_r)
+
+nct_l_r = qgraph(input_NCTgraph_l_r, edge.labels = TRUE,
+                  layout = "spring", theme = "Borkulo", 
+                  labels = shortnames, nodeNames = longnames,
+                  groups=Totalgroup_comm, color= Totalgroup_cols,
+                  cut = 0.10, maximum = 1, 
+                  details = FALSE, vsize=6.0, 
+                  legend = FALSE, legend.cex = 0.35, borders = TRUE)
+
+#l_m 
+input_NCTgraph_l_m <- vote_l_data_net - vote_m_data_net
+input_NCTgraph_l_m[upper.tri(input_NCTgraph_l_m)][which(NCT_l_m$einv.pvals$`p-value` >= .05)] <- 0
+input_NCTgraph_l_m <- forceSymmetric(input_NCTgraph_l_m)
+
+nct_l_m = qgraph(input_NCTgraph_l_m, edge.labels = TRUE,
+                  layout = "spring", theme = "Borkulo", 
+                  labels = shortnames, nodeNames = longnames,
+                  groups=Totalgroup_comm, color= Totalgroup_cols,
+                  cut = 0.10, maximum = 1, 
+                  details = FALSE, vsize=6.0, 
+                  legend = FALSE, legend.cex = 0.35, borders = TRUE)
 ```
 
 ```{r}
-#Closeness
-H2_closeness = ggplot() +
-  geom_violin(data = boots_att_closeness, 
-              aes(x = type, y = value, fill = type, color = type), 
-              scale = "count", width = 0.6, alpha = 0.5, color = "transparent") +
-  geom_errorbar(data = closeness_summary, aes(x = type, ymin = ymin, ymax = ymax), 
-                width = 0.2, linewidth = 0.7, color = "black") +
-  xlab(NULL) +  
-  ylab(NULL) +
-  scale_color_manual(values = c("Operational" = "#3FA796", "Symbolic" = "#E96479")) +
-  guides(fill = FALSE, color = FALSE) +
-  ggtitle("Closeness")
+#Supplement multiplot
+jpeg(here("Output", "Supplement", "Fig_4.jpg"), 
+    height = 700, width = 1400, quality = 100)
 
-#ggsave(here("Output", "GGM", "H2_closeness.jpg"), H2_closeness, width = 6, height = 4)
+L<-averageLayout(nct_l_m, nct_l_r, nct_r_m, layout = "spring")
+lmat <- matrix(1:3, 1)
+lo <- layout(lmat, width = c(1, 1))
+
+set.seed(1)
+nct_r_m = qgraph(input_NCTgraph_r_m, edge.labels = TRUE,
+                  layout = "spring", theme = "Borkulo", title = "Right - 5SM",
+                  labels = shortnames, nodeNames = longnames,
+                  groups=Totalgroup_comm, color= Totalgroup_cols,
+                  cut = 0.10, maximum = 1, 
+                  details = FALSE, vsize=11, 
+                  legend = FALSE, borders = TRUE)
+
+set.seed(1)
+nct_l_r = qgraph(input_NCTgraph_l_r, edge.labels = TRUE,
+                  layout = "spring", theme = "Borkulo", title = "Left - Right",
+                  labels = shortnames, nodeNames = longnames,
+                  groups=Totalgroup_comm, color= Totalgroup_cols,
+                  cut = 0.10, maximum = 1, 
+                  details = FALSE, vsize=11, 
+                  legend = FALSE, borders = TRUE)
+
+set.seed(1)
+nct_l_m = qgraph(input_NCTgraph_l_m, edge.labels = TRUE,
+                  layout = "spring", theme = "Borkulo", title = "Left - 5SM",
+                  labels = shortnames, nodeNames = longnames,
+                  groups=Totalgroup_comm, color= Totalgroup_cols,
+                  cut = 0.10, maximum = 1, 
+                  details = FALSE, vsize=11, 
+                  legend = FALSE, borders = TRUE)
+
+dev.off()
+```
+
+### H4: Δ (R/M5S) < Δ (L/R) < Δ (L/M5S)  
+
+```{r}
+# Summary of results of NCTs
+#NCT_r_m
+#NCT_l_r
+#NCT_l_m
+
+#matrices where cell represent diff in values of edges
+#that are statistically significant according to NCTs
+#input_NCTgraph_r_m
+#input_NCTgraph_l_r
+#input_NCTgraph_l_m
+
+             #### Option 1: absolute sum of differences in edge weight ####
+#r_m
+abs_diff_r_m = NCT_r_m$einv.real %>% 
+  as.vector() %>% 
+  abs() %>% 
+  sum() #14.39907
+
+#l_r
+abs_diff_l_r = NCT_l_r$einv.real %>% 
+  as.vector() %>% 
+  abs() %>% 
+  sum() #12.49714
+
+#l_m
+abs_diff_l_m = NCT_l_m$einv.real %>% 
+  as.vector() %>% 
+  abs() %>% 
+  sum() #11.16066
+
+          #### Option 2: absolute sum of differences in edge weight, ####
+             #### only for edges that differ according to the NCT ####
+
+#Total diff in edge weights (abs values)
+#r_m
+vector_r_m = input_NCTgraph_r_m %>% 
+  as.vector() %>% 
+  abs() %>% 
+  sum() #8.87308
+
+#l_r
+vector_l_r = input_NCTgraph_l_r %>% 
+  as.vector() %>% 
+  abs() %>% 
+  sum() #6.077991
+
+#l_m
+vector_l_m = input_NCTgraph_l_m %>% 
+  as.vector() %>% 
+  abs() %>% 
+  sum() #5.259666
+
+        #### Option 3: calculate cor between signed matrices ####
+cor_r_m = cor(c(as.matrix(vote_r_data_net)), c(as.matrix(vote_m_data_net))) #0.5234926
+cor_l_r = cor(c(as.matrix(vote_l_data_net)), c(as.matrix(vote_r_data_net))) #0.5889477
+cor_l_m = cor(c(as.matrix(vote_l_data_net)), c(as.matrix(vote_m_data_net))) #0.7872863
 ```
 
 ```{r}
-#multiplot
-H2_multiplot = H2_strength + H2_betweenness + H2_closeness 
-ggsave(here("Output", "GGM", "H2_multiplot.jpg"), H2_multiplot, width = 8, height = 6)
+#Graph option 2
+H4_2 = tibble(variable = c("Right - M5S", "Left - Right", "Left - M5S"),
+                   dif = c(vector_r_m, vector_l_r, vector_l_m)) %>% 
+  arrange(desc(dif)) %>% 
+  ggplot(aes(x=reorder(variable, -dif), y = dif, fill=variable)) +
+  geom_bar(stat="identity") +
+  geom_text(aes(label= formattable::digits(dif, digits = 2)), parse = FALSE, vjust=-0.5, size=3) +
+  labs(y = "Absolute difference between edges", x = "") +
+  scale_y_continuous(limits = c(0,10)) +
+  theme(legend.position = "none") + 
+  scale_fill_brewer(palette = "Pastel1")
+
 ```
 
-### H3, vote hypothesis
-The node vote will be more closely connected to symbolic, rather than 
-operational, variables
-
 ```{r}
-#Data mang for graph H3
-
-# Create an empty list to store the matrices
-matrix_list <- list()
-
-# Loop through from 1 to 1000
-for (i in 1:10000) {
-  # Extract the matrix and add it to the list
-  matrix_list[[i]] <- df.boot_all[["boots"]][[i]][["graph"]]
-}
-
-# Create an empty data frame to store the results
-result_df <- data.frame()
-
-# Loop through each matrix in matrix_list
-for (i in 1:10000) {
-  centrality_result <- centrality(
-    matrix_list[[i]], all.shortest.paths = TRUE)$ShortestPathLengths[, 20]
-  
-  # Create a temporary data frame for this iteration
-  temp_df <- data.frame(
-    voteshort = centrality_result,
-    type = nature_all,
-    node = shortnames_all
-  )
-  
-  # Append the temporary data frame to the result_df
-  result_df <- rbind(result_df, temp_df)
-}
-
-#Data from results_df
-data_h3_boot = result_df %>% 
-  dplyr::select(c(voteshort, type)) %>% 
-  dplyr::filter(type != "Vote")
-
-#as factor
-data_h3_boot$type = as.factor(data_h3_boot$type)
+#Graph option 3
+H4_3 = tibble(variable = c("Right - M5S", "Left - Right", "Left - M5S"),
+                   dif = c(cor_r_m, cor_l_r, cor_l_m)) %>% 
+  arrange(desc(dif)) %>% 
+  ggplot(aes(x=reorder(variable, -dif), y = dif, fill=variable)) +
+  geom_bar(stat="identity") +
+  geom_text(aes(label= formattable::digits(dif, digits = 2)), parse = FALSE, vjust=-0.5, size=3) +
+  labs(y = "Correlation between network matrices", x = "") +
+  scale_y_continuous(limits = c(0,1)) +
+  theme(legend.position = "none") + 
+  scale_fill_brewer(palette = "Pastel1")
 ```
 
-
 ```{r}
-#strength
-vote_summary <- data_h3_boot %>%
-  group_by(type) %>%
-  summarise(
-    m = mean(voteshort),
-    ymin = quantile(voteshort, 0.025),  # 2.5 percentile, α=0.05 (α/2 = 0.025)
-    ymax = quantile(voteshort, 0.975)   # 97.5 percentile, α=0.05 (1 - α/2 = 0.975)
-  )
+#Figure_4 multiplot
+Figure_4 = H4_2 + H4_3
 
-#Strength
-H3_boot = ggplot() +
-  geom_violin(data = data_h3_boot, 
-              aes(x = type, y = voteshort, fill = type, color = type), 
-              scale = "count", width = 0.6, alpha = 0.5, color = "transparent") +
-  geom_errorbar(data = vote_summary, aes(x = type, ymin = ymin, ymax = ymax), 
-                width = 0.2, linewidth = 0.7, color = "black") +
-  xlab(NULL) +  
-  ylab(NULL) +
-  scale_color_manual(values = c("Operational" = "#3FA796", "Symbolic" = "#E96479")) +
-  guides(fill = FALSE, color = FALSE)
-
-ggsave(here("Output", "GGM", "H3_boot.jpg"), H3_boot, width = 6, height = 4)  
+# Save the multiplot
+ggsave(here("Output", "Article", "Figure_4.jpg"), Figure_4, width = 12, height = 6)
 ```
 
 
