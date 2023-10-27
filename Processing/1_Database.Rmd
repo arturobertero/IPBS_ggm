@@ -64,17 +64,17 @@ IPBS = response_original %>%
 #colnames
 colnames(IPBS) = c(
 "sex","age","educ","pol_int","vote","L_R","PTV_PD",
-"PTV_FI","PTV_L", "PTV_M5S","PTV_FDI","step_c_a","abortion","euth","omosex_m",
-"redis","flat_tax","min_wage","cit_inc","glob","immigration","big_gov",
-"pub_vs_priv","weapons_ukr")
+"PTV_FI","PTV_L", "PTV_M5S","PTV_FDI","adopt","abort","eutha","marria",
+"redis","flat_t","m_wage","cit_in","globa","immig","big_go",
+"pub_pri","ukrai")
 
 #Recode polarity: for everything but sociodem high values = endorsment 
 #of that issue
 IPBS = IPBS %>% 
   mutate(sex = ifelse(sex==2, 0, 1),
          across(pol_int, ~ 5 - .),
-         across(abortion, ~ 5 - .),
-         across(weapons_ukr,  ~ 5 - .))
+         across(abort, ~ 5 - .),
+         across(ukrai,  ~ 5 - .))
 
 #Recode as factors 
 IPBS = IPBS %>%
@@ -96,9 +96,9 @@ IPBS = IPBS %>%
 IPBS = IPBS %>% 
   dplyr::select(c(
 "L_R","PTV_PD","PTV_FI","PTV_L","PTV_M5S","PTV_FDI", #symbolic comp
-"step_c_a","abortion","euth","omosex_m", #ethics
-"redis","flat_tax","min_wage","cit_inc","glob","immigration","big_gov",
-"pub_vs_priv","weapons_ukr", #issues
+"adopt","abort","eutha","marria", #ethics
+"redis","flat_t","m_wage","cit_in","globa","immig","big_go",
+"pub_pri","ukrai", #issues
 "vote_cat","sex","age","educ_cat", 
 "pol_int", "pol_int_cat" #sociodem/predictors
 ))
@@ -114,7 +114,7 @@ IPBS = IPBS %>%
 ```{r}
 #Select and listwise
 IPBS_vote = IPBS %>% 
-  dplyr::select(L_R:weapons_ukr,
+  dplyr::select(L_R:ukrai,
          vote_cat) %>% 
   na.omit()
 
@@ -139,7 +139,7 @@ vote_left = IPBS_vote[[4]] #450
 
 #Select and listwise
 IPBS_pol_int = IPBS %>% 
-  dplyr::select(L_R:weapons_ukr,
+  dplyr::select(L_R:ukrai,
          pol_int) %>% 
   na.omit()
 
@@ -179,7 +179,7 @@ polint_2_2_h = pol_int_high #high: 238
 ```{r}
 #Select and listwise
 IPBS_educ = IPBS %>% 
-  dplyr::select(L_R:weapons_ukr,
+  dplyr::select(L_R:ukrai,
          educ_cat) %>% 
     na.omit()
 

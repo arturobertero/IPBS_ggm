@@ -28,7 +28,7 @@ IPBS = readRDS((here("Input", "IPBS.rds")))
 
 #Filter smaller dataset
 att = IPBS %>% 
-  dplyr::select(c(L_R:weapons_ukr)) 
+  dplyr::select(c(L_R:ukrai)) 
 
 #Partitions
 load(file = here("Input", "Partitions", "pol_int_partitions.RData"))
@@ -59,7 +59,7 @@ Totalgroup_comm <- list(
  "Symbolic"=c(1:6),
  "Operational"=c(7:19))
 
-Totalgroup_cols <- c("#A63F96","#3FA796")
+Totalgroup_cols <- c("#DDA0DD","#3FA796")
 
 #remove labels
 att = sapply(att, haven::zap_labels)
@@ -82,8 +82,8 @@ set.seed(1)
 Graph_att = qgraph(att_net,
   layout = "spring", theme = "Borkulo", 
   labels = shortnames, nodeNames = longnames,
-  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
-  groups=Totalgroup_comm, color=Totalgroup_cols,
+  minimum = 0.05, maximum = 1, cut = 0.14, vsize=7.0, label.cex=1.1,
+  groups=Totalgroup_comm, color=Totalgroup_cols, edge.width = 1.7,
   legend = TRUE, legend.cex = 0.40, borders = FALSE,
   filetype="jpg", filename=here("Output", "Article", "Figure_1"))
 ```
@@ -302,27 +302,27 @@ lo <- layout(lmat, width = c(1, 1))
 
 set.seed(1)
 Graph_vote_l = qgraph(vote_l_data_net,
-  layout = L, theme = "Borkulo", title = "Left",
-  labels = shortnames, nodeNames = longnames,
-  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  layout = L, theme = "Borkulo", title = "Left", title.cex = 2,
+  labels = shortnames, nodeNames = longnames, edge.width = 1.9, 
+  threshold = 0.06, maximum = 1, vsize=11, 
   groups=Totalgroup_comm, color=Totalgroup_cols,
-  legend = FALSE, borders = FALSE)
+  legend = FALSE, borders = FALSE, cut = 0.10)
 
 set.seed(1)
 Graph_vote_m = qgraph(vote_m_data_net,
-  layout = L, theme = "Borkulo", title = "M5S",
-  labels = shortnames, nodeNames = longnames,
-  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  layout = L, theme = "Borkulo", title = "M5S", title.cex = 2,
+  labels = shortnames, nodeNames = longnames, edge.width = 1.9,
+  threshold = 0.06, maximum = 1, vsize=11,
   groups=Totalgroup_comm, color=Totalgroup_cols,
-  legend = FALSE, borders = FALSE)
+  legend = FALSE, borders = FALSE, cut = 0.10)
 
 set.seed(1)
 Graph_vote_r = qgraph(vote_r_data_net,
-  layout = L, theme = "Borkulo", title = "Right",
-  labels = shortnames, nodeNames = longnames,
-  cut = 0.07, maximum = 1, vsize=7.0, label.cex=1.1,
+  layout = L, theme = "Borkulo", title = "Right", title.cex = 2,
+  labels = shortnames, nodeNames = longnames, edge.width = 1.9,
+  threshold = 0.05, maximum = 1, vsize=11, 
   groups=Totalgroup_comm, color=Totalgroup_cols,
-  legend = FALSE, borders = FALSE)
+  legend = FALSE, borders = FALSE, cut = 0.10)
 
 dev.off()
 ```
@@ -1057,7 +1057,7 @@ H4_2 = tibble(variable = c("Right - M5S", "Left - Right", "Left - M5S"),
   ggplot(aes(x=reorder(variable, -dif), y = dif, fill=variable)) +
   geom_bar(stat="identity") +
   geom_text(aes(label= formattable::digits(dif, digits = 2)), parse = FALSE, vjust=-0.5, size=3) +
-  labs(y = "Absolute difference between edges", x = "") +
+  labs(y = "Absolute edge difference", x = "") +
   scale_y_continuous(limits = c(0,10)) +
   theme(legend.position = "none") + 
   scale_fill_brewer(palette = "Pastel1")
@@ -1072,7 +1072,7 @@ H4_3 = tibble(variable = c("Right - M5S", "Left - Right", "Left - M5S"),
   ggplot(aes(x=reorder(variable, -dif), y = dif, fill=variable)) +
   geom_bar(stat="identity") +
   geom_text(aes(label= formattable::digits(dif, digits = 2)), parse = FALSE, vjust=-0.5, size=3) +
-  labs(y = "Correlation between network matrices", x = "") +
+  labs(y = "Correlation between matrices", x = "") +
   scale_y_continuous(limits = c(0,1)) +
   theme(legend.position = "none") + 
   scale_fill_brewer(palette = "Pastel1")
@@ -1080,7 +1080,7 @@ H4_3 = tibble(variable = c("Right - M5S", "Left - Right", "Left - M5S"),
 
 ```{r}
 #Figure_4 multiplot
-Figure_4 = H4_2 + H4_3
+Figure_4 = H4_2 + plot_spacer() + H4_3 + plot_layout(widths = c(4, 0.5 ,4))
 
 # Save the multiplot
 ggsave(here("Output", "Article", "Figure_4.jpg"), Figure_4, width = 12, height = 6)
