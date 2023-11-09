@@ -988,7 +988,6 @@ nct_l_m = qgraph(input_NCTgraph_l_m, edge.labels = TRUE,
 dev.off()
 ```
 
-### H4: Δ (R/M5S) < Δ (L/R) < Δ (L/M5S)  
 
 ```{r}
 # Summary of results of NCTs

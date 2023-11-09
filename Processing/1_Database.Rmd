@@ -74,6 +74,8 @@ IPBS = IPBS %>%
   mutate(sex = ifelse(sex==2, 0, 1),
          across(pol_int, ~ 5 - .),
          across(abort, ~ 5 - .),
+         across(globa, ~ 7 - .),
+         across(pub_pri, ~ 8 - .),
          across(ukrai,  ~ 5 - .))
 
 #Recode as factors 
