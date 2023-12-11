@@ -106,7 +106,8 @@ IPBS = IPBS %>%
 ))
 
 #Stargazer
-#stargazer(as.data.frame(IPBS), type = "text", nobs = TRUE)
+#stargazer(as.data.frame(IPBS), type = "text", nobs = TRUE, 
+#          out = here("Output", "Supplement", "desc.html"))
 ```
 
 ### Partitions of IPBS according to different metrics

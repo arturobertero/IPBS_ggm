@@ -162,6 +162,35 @@ Graph_pint_h = qgraph(pint_h_data_net,
 dev.off()
 ```
 
+```{r}
+#mean absolute edge weight of non zero edge and number of edges by levels of pint
+
+#pint_l
+pint_l_noz = (pint_l_data_net[pint_l_data_net != 0])
+
+pint_l_mean = pint_l_noz %>% 
+  as.vector() %>% 
+  abs() %>% 
+  mean()
+
+pint_l_num = pint_l_noz %>% 
+  as.vector() %>%
+  length()
+
+#pint_h
+pint_h_noz = (pint_h_data_net[pint_h_data_net != 0])
+
+pint_h_mean = pint_h_noz %>% 
+  as.vector() %>% 
+  abs() %>% 
+  mean()
+
+pint_h_num = pint_h_noz %>% 
+  as.vector() %>%
+  length()
+```
+
+
 ## Estimation by levels of educ
 ```{r}
 #data
@@ -648,7 +677,7 @@ H1 <- ggplot() +
   theme(axis.title.x = element_text(), legend.position = "none")
 ``` 
 
-### H1 2_1 (robustness)
+#### H1 2_1 (robustness)
 Replicate on pint with two levels to assess stability
 ```{r}
 #Extract boots_pint_l_2_1
@@ -731,7 +760,7 @@ H1_2_1 <- ggplot() +
 
 ``` 
 
-### H1 2_2 (robustness)
+#### H1 2_2 (robustness)
 
 ```{r}
 #Extract boots_pint_l_2_2
@@ -820,6 +849,238 @@ Fig_3 = H1_2_1 / H1_2_2
 
 # Save the multiplot
 ggsave(here("Output", "Supplement", "Fig_3.jpg"), Fig_3, width = 7, height = 7)
+```
+
+##### H1 network density (robustness)
+
+```{r}
+#Loop: extract boots_pint_l
+
+matrix_list <- list()
+
+for (i in 1:10000) {
+  matrix_list[[i]] <- df.boot_pint_l[["boots"]][[i]][["graph"]]
+}
+
+sum_values <- numeric(10000)
+for (i in 1:10000) {
+  squared_matrix <- matrix_list[[i]]^2
+  value <- sum(squared_matrix)
+  sum_values[i] <- value
+}
+
+dens_pint_l = sum_values
+
+#Loop: extract boots_pint_m
+
+matrix_list <- list()
+
+for (i in 1:10000) {
+  matrix_list[[i]] <- df.boot_pint_m[["boots"]][[i]][["graph"]]
+}
+
+sum_values <- numeric(10000)
+for (i in 1:10000) {
+  squared_matrix <- matrix_list[[i]]^2
+  value <- sum(squared_matrix)
+  sum_values[i] <- value
+}
+
+dens_pint_m = sum_values
+
+#Loop: extract boots_pint_h
+
+matrix_list <- list()
+
+for (i in 1:10000) {
+  matrix_list[[i]] <- df.boot_pint_h[["boots"]][[i]][["graph"]]
+}
+
+sum_values <- numeric(10000)
+for (i in 1:10000) {
+  squared_matrix <- matrix_list[[i]]^2
+  value <- sum(squared_matrix)
+  sum_values[i] <- value
+}
+
+dens_pint_h = sum_values
+```
+
+```{r}
+#Graph density
+# Create a vector pint
+pint = c(rep("Low", 10000), rep("Mid", 10000), rep("High", 10000))
+pint = factor(pint, levels=c("Low", "Mid", "High"))
+# Create mcon_pint for the graph
+dens_pint <- data.frame(
+  dens_val = c(dens_pint_l,dens_pint_m,dens_pint_h),
+  pint = pint
+)
+
+# Calculate quantile-based confidence intervals (90% CI)
+dens_pint_summary <- dens_pint %>%
+  group_by(pint) %>%
+  summarise(
+    m = mean(dens_val),
+    ymin = quantile(dens_val, 0.025),  # 2.5 percentile, α=0.05 (α/2 = 0.025)
+    ymax = quantile(dens_val, 0.975)   # 97.5 percentile, α=0.05 (1 - α/2 = 0.975)
+  )
+
+# Create the plot
+dens_pint_graph <- ggplot() +
+  geom_violin(data = dens_pint, aes(x = pint, y = dens_val), 
+              scale = "count", width = 0.6, alpha = 0.5, fill = "black") +
+  geom_errorbar(data = dens_pint_summary, aes(x = pint, ymin = ymin, ymax = ymax), 
+                width = 0.2, linewidth = 0.7, color = "black") +
+  ylab("Sum of edge weights") +
+  xlab("Political Interest") +
+  theme(axis.title.x = element_text(), legend.position = "none")
+``` 
+
+###### H1 2_1 network density (robustness)
+
+```{r}
+#Loop: extract boots_pint_l_2_1
+
+matrix_list <- list()
+
+for (i in 1:10000) {
+  matrix_list[[i]] <- df.boot_pint_l_2_1[["boots"]][[i]][["graph"]]
+}
+
+sum_values <- numeric(10000)
+for (i in 1:10000) {
+  squared_matrix <- matrix_list[[i]]^2
+  value <- sum(squared_matrix)
+  sum_values[i] <- value
+}
+
+dens_pint_l_2_1 = sum_values
+
+#Loop: extract boots_pint_h_2_1
+
+matrix_list <- list()
+
+for (i in 1:10000) {
+  matrix_list[[i]] <- df.boot_pint_h_2_1[["boots"]][[i]][["graph"]]
+}
+
+sum_values <- numeric(10000)
+for (i in 1:10000) {
+  squared_matrix <- matrix_list[[i]]^2
+  value <- sum(squared_matrix)
+  sum_values[i] <- value
+}
+
+dens_pint_h_2_1 = sum_values
+```
+
+```{r}
+#Graph density 2_1
+# Create a vector pint
+pint = c(rep("Low", 10000), rep("High", 10000))
+pint = factor(pint, levels=c("Low", "Mid", "High"))
+# Create mcon_pint for the graph
+dens_pint_2_1 <- data.frame(
+  dens_val = c(dens_pint_l_2_1,dens_pint_h_2_1),
+  pint = pint
+)
+
+# Calculate quantile-based confidence intervals (90% CI)
+dens_pint_2_1_summary <- dens_pint_2_1 %>%
+  group_by(pint) %>%
+  summarise(
+    m = mean(dens_val),
+    ymin = quantile(dens_val, 0.025),  # 2.5 percentile, α=0.05 (α/2 = 0.025)
+    ymax = quantile(dens_val, 0.975)   # 97.5 percentile, α=0.05 (1 - α/2 = 0.975)
+  )
+
+# Create the plot
+dens_pint_2_1_graph <- ggplot() +
+  geom_violin(data = dens_pint_2_1, aes(x = pint, y = dens_val), 
+              scale = "count", width = 0.6, alpha = 0.5, fill = "black") +
+  geom_errorbar(data = dens_pint_2_1_summary, aes(x = pint, ymin = ymin, ymax = ymax), 
+                width = 0.2, linewidth = 0.7, color = "black") +
+  ylab("Sum of edge weights") +
+  xlab("Political Interest - Option 1") +
+  theme(axis.title.x = element_text(), legend.position = "none")
+``` 
+
+###### H1 2_2 network density (robustness)
+
+```{r}
+#Loop: extract boots_pint_l_2_2
+
+matrix_list <- list()
+
+for (i in 1:10000) {
+  matrix_list[[i]] <- df.boot_pint_l_2_2[["boots"]][[i]][["graph"]]
+}
+
+sum_values <- numeric(10000)
+for (i in 1:10000) {
+  squared_matrix <- matrix_list[[i]]^2
+  value <- sum(squared_matrix)
+  sum_values[i] <- value
+}
+
+dens_pint_l_2_2 = sum_values
+
+#Loop: extract boots_pint_h_2_2
+
+matrix_list <- list()
+
+for (i in 1:10000) {
+  matrix_list[[i]] <- df.boot_pint_h_2_2[["boots"]][[i]][["graph"]]
+}
+
+sum_values <- numeric(10000)
+for (i in 1:10000) {
+  squared_matrix <- matrix_list[[i]]^2
+  value <- sum(squared_matrix)
+  sum_values[i] <- value
+}
+
+dens_pint_h_2_2 = sum_values
+```
+
+```{r}
+#Graph density 2_2
+# Create a vector pint
+pint = c(rep("Low", 10000), rep("High", 10000))
+pint = factor(pint, levels=c("Low", "Mid", "High"))
+# Create mcon_pint for the graph
+dens_pint_2_2 <- data.frame(
+  dens_val = c(dens_pint_l_2_2,dens_pint_h_2_2),
+  pint = pint
+)
+
+# Calculate quantile-based confidence intervals (90% CI)
+dens_pint_2_2_summary <- dens_pint_2_2 %>%
+  group_by(pint) %>%
+  summarise(
+    m = mean(dens_val),
+    ymin = quantile(dens_val, 0.025),  # 2.5 percentile, α=0.05 (α/2 = 0.025)
+    ymax = quantile(dens_val, 0.975)   # 97.5 percentile, α=0.05 (1 - α/2 = 0.975)
+  )
+
+# Create the plot
+dens_pint_2_2_graph <- ggplot() +
+  geom_violin(data = dens_pint_2_2, aes(x = pint, y = dens_val), 
+              scale = "count", width = 0.6, alpha = 0.5, fill = "black") +
+  geom_errorbar(data = dens_pint_2_2_summary, aes(x = pint, ymin = ymin, ymax = ymax), 
+                width = 0.2, linewidth = 0.7, color = "black") +
+  ylab("Sum of edge weights") +
+  xlab("Political Interest - Option 2") +
+  theme(axis.title.x = element_text(), legend.position = "none")
+``` 
+
+```{r}
+#create multiplot
+Fig_4 = dens_pint_graph / dens_pint_2_1_graph / dens_pint_2_2_graph 
+
+# Save the multiplot
+ggsave(here("Output", "Supplement", "Fig_4.jpg"), Fig_4, width = 7, height = 10.5)
 ```
 
 ### H2 rival constraint hypothesis
@@ -951,7 +1212,7 @@ nct_l_m = qgraph(input_NCTgraph_l_m, edge.labels = TRUE,
 
 ```{r}
 #Supplement multiplot
-jpeg(here("Output", "Supplement", "Fig_4.jpg"), 
+jpeg(here("Output", "Supplement", "Fig_5.jpg"), 
     height = 700, width = 1400, quality = 100)
 
 L<-averageLayout(nct_l_m, nct_l_r, nct_r_m, layout = "spring")
