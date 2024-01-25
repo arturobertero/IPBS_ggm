@@ -659,7 +659,7 @@ H1 <- ggplot() +
               scale = "count", width = 0.6, fill = "#5b5b5b") +
   geom_errorbar(data = mcon_pint_summary, aes(x = pint, ymin = ymin, ymax = ymax), 
                 width = 0.2, linewidth = 0.7, color = "black") +
-  ylab("Average Constraint") +
+  ylab("Average Tightness") +
   xlab("Political Interest") +
   theme(axis.title.x = element_text(), legend.position = "none")
 ``` 
@@ -741,7 +741,7 @@ H1_2_1 <- ggplot() +
               scale = "count", width = 0.6, fill = "#5b5b5b") +
   geom_errorbar(data = mcon_pint_2_1_summary, aes(x = pint, ymin = ymin, ymax = ymax), 
                 width = 0.2, linewidth = 0.7, color = "black") +
-  ylab("Average Constraint") +
+  ylab("Average Tightness") +
   xlab("Political Interest - Option 1") +
   theme(axis.title.x = element_text(), legend.position = "none")
 
@@ -824,7 +824,7 @@ H1_2_2 <- ggplot() +
               scale = "count", width = 0.6, fill = "#5b5b5b") +
   geom_errorbar(data = mcon_pint_2_2_summary, aes(x = pint, ymin = ymin, ymax = ymax), 
                 width = 0.2, linewidth = 0.7, color = "black") +
-  ylab("Average Constraint") +
+  ylab("Average Tightness") +
   xlab("Political Interest - Option 2") +
   theme(axis.title.x = element_text(), legend.position = "none")
 ```
@@ -906,7 +906,7 @@ H2 <- ggplot() +
               scale = "count", width = 0.6, fill = "#5b5b5b") +
   geom_errorbar(data = mcon_edu_summary, aes(x = educ, ymin = ymin, ymax = ymax), 
                 width = 0.2, linewidth = 0.7, color = "black") +
-  ylab("Average Constraint") +
+  ylab("Average Tightness") +
   xlab("Education") +
   theme(axis.title.x = element_text(), legend.position = "none")
 
