@@ -61,8 +61,7 @@ Totalgroup_comm <- list(
   "Operational" = c(7:19)
 )
 
-Totalgroup_cols <- c("#eeeeee", "#adadad")  # Third color is omitted for now, could be added if needed.
-
+Totalgroup_cols <- c("#966FD6B3","#008B8BB3")  
 ```
 
 ```{r}
@@ -87,11 +86,11 @@ att_net = att_net^2
 
 #plot
 qgraph(att_net,
-         fade = FALSE, layout = "spring", theme = "gray", 
+         fade = TRUE, layout = "spring", theme = "colorblind",  
          labels = shortnames, nodeNames = longnames,
-         vsize = 7.0, label.cex = 1.1, cut = 0.07,
+         vsize = 7.0, label.cex = 1.1, esize = 15, vTrans = 255,
          groups = Totalgroup_comm, color = Totalgroup_cols,
-         legend = F, legend.cex = 0.40, title = "cor",
+         legend = F, legend.cex = 0.40, title = "Correlational network",
          filetype = "jpg", filename = here("Output", "Supplement", "att"))
 ```
 
@@ -124,9 +123,9 @@ generate_network_plots <- function(low_data, high_data, shortnames, longnames, g
   # Save plot for low data
   set.seed(1)
   qgraph(low_data_net,
-         fade = FALSE, layout = "spring", theme = "gray", 
+         fade = TRUE, layout = "spring", theme = "colorblind",  
          labels = shortnames, nodeNames = longnames,
-         vsize = 7.0, label.cex = 1.1, cut = 0.07,
+         vsize = 7.0, label.cex = 1.1, esize = 15, vTrans = 255,
          groups = group_names, color = group_colors,
          legend = F, legend.cex = 0.40, title = title_low,
          filetype = "jpg", filename = here("Output", "Supplement", paste0(file_base, "_Low")))
@@ -134,9 +133,9 @@ generate_network_plots <- function(low_data, high_data, shortnames, longnames, g
   # Save plot for high data
   set.seed(1)
   qgraph(high_data_net,
-         fade = FALSE, layout = "spring", theme = "gray", 
+         fade = TRUE, layout = "spring", theme = "colorblind",  
          labels = shortnames, nodeNames = longnames,
-         vsize = 7.0, label.cex = 1.1, cut = 0.07,
+         vsize = 7.0, label.cex = 1.1, esize = 15, vTrans = 255,
          groups = group_names, color = group_colors,
          legend = F, legend.cex = 0.40, title = title_high,
          filetype = "jpg", filename = here("Output", "Supplement", paste0(file_base, "_High")))
@@ -174,6 +173,28 @@ generate_network_plots(
 ## MGMs
 
 ```{r}
+# mgm on att
+  mgm_att <- mgm(att, type = rep("g", length(shortnames)), 
+                   level = rep(1, length(shortnames)), lambdaSel = "EBIC", ruleReg = "OR")
+  
+  # Predictability
+  pred_att <- predict(object = mgm_att, data = att, errorCon = 'R2')
+  
+  # Plot the MGM network
+  graph_mgm <- qgraph(mgm_att$pairwise$wadj, layout = 'spring',
+                      labels = shortnames, nodeNames = longnames,  
+                      groups = Totalgroup_comm, color = Totalgroup_cols, 
+                      legend = T, legend.cex = 0.33, title = "mgm",
+                      edge.color = mgm_att$pairwise$edgecolor_cb, vTrans = 255,
+                      borders = T, vsize = 7.0, esize = 15, GLratio = 2,
+                      pie = pred_att$errors[,2], pieColor = rep('#FFFF00', length(shortnames)),
+                      filetype = "jpg",  
+                      filename = here("Output", "Supplement", "att_mgm"))
+
+```
+
+
+```{r}
 # Function to ensure input data is in matrix format
 prepare_matrix_data <- function(data) {
   if (!is.matrix(data)) {
@@ -198,7 +219,7 @@ fit_and_plot_mgm <- function(data, shortnames, longnames, mgm_groups, mgm_colors
   graph_mgm <- qgraph(mgm_model$pairwise$wadj, layout = 'spring',
                       labels = shortnames, nodeNames = longnames,  
                       groups = mgm_groups, color = mgm_colors, 
-                      legend = T, legend.cex = 0.33, 
+                      legend = F, legend.cex = 0.33, vTrans = 255,
                       edge.color = mgm_model$pairwise$edgecolor_cb,
                       borders = T, vsize = 7.0, esize = 15, GLratio = 2,
                       pie = pred_mgm$errors[,2], pieColor = rep('#FFFF00', length(shortnames)),
@@ -208,7 +229,6 @@ fit_and_plot_mgm <- function(data, shortnames, longnames, mgm_groups, mgm_colors
 
 # Fit and plot MGM for all datasets
 datasets <- list(
-  "att" = att,
   "pol_int_low" = polint_2_1_l,
   "pol_int_high" = polint_2_1_h,
   "educ_low" = educ_low,
@@ -586,12 +606,12 @@ cons_educ_h_pc <- process_boots_data(df.boot_educ_h_pc)
 ```
 
 
-### H1 and H2 
+## H1 and H2 
 
-#### Multiplot (cor vs mgm)
+### Multiplot
 
 ```{r}
-# Figure_1
+# Figure_1 (cor vs mgm)
 img1 <- image_read(here("Output", "Supplement", "att.jpg"))
 img2 <- image_read(here("Output", "Supplement", "att_mgm.jpg"))
 combined_img <- image_append(c(img1, img2), stack = FALSE)
@@ -601,10 +621,10 @@ image_write(combined_img, path = here("Output", "Article", "Figure_1.jpg"))
 ```
 
 
-#### Violins
+### Violins
 
 ```{r}
-# Function to create and print plots
+# Function to create and print plots with custom colors for Correlational network and mgm
 create_plot <- function(df_l, df_m = NULL, df_h, df_l_pc, df_m_pc = NULL, df_h_pc, x_axis_label) {
   # Create vectors for pint (if applicable) or education
   if (!is.null(df_m)) {
@@ -613,8 +633,8 @@ create_plot <- function(df_l, df_m = NULL, df_h, df_l_pc, df_m_pc = NULL, df_h_p
     
     # Combine the cons_pint and cons_pint_pc data into one data frame
     const_val <- c(df_l, df_m, df_h, df_l_pc, df_m_pc, df_h_pc)
-    data_type <- rep(c("Correlation", "Partial Correlation"), each = 30000)
-    pint_vector <- rep(pint, 2)  # Repeat pint vector twice for correlation and partial correlation
+    data_type <- rep(c("Correlational network", "mgm"), each = 30000)
+    pint_vector <- rep(pint, 2)  # Repeat pint vector twice for Correlational network and mgm
 
   } else {
     pint <- c(rep("Low", 10000), rep("High", 10000))
@@ -622,8 +642,8 @@ create_plot <- function(df_l, df_m = NULL, df_h, df_l_pc, df_m_pc = NULL, df_h_p
     
     # Combine the cons_pint and cons_pint_pc data into one data frame (only low and high)
     const_val <- c(df_l, df_h, df_l_pc, df_h_pc)
-    data_type <- rep(c("Correlation", "Partial Correlation"), each = 20000)
-    pint_vector <- rep(pint, 2)  # Repeat pint vector twice for correlation and partial correlation
+    data_type <- rep(c("Correlational network", "mgm"), each = 20000)
+    pint_vector <- rep(pint, 2)  # Repeat pint vector twice for Correlational network and mgm
   }
 
   mcon_data <- data.frame(
@@ -641,15 +661,16 @@ create_plot <- function(df_l, df_m = NULL, df_h, df_l_pc, df_m_pc = NULL, df_h_p
       ymax = quantile(const_val, 0.975)   # 97.5 percentile
     )
 
-  # Create the faceted plot with different y-axis scales
+  # Create the faceted plot with different y-axis scales and custom colors
   plot <- ggplot() +
-    geom_violin(data = mcon_data, aes(x = pint, y = const_val), 
-                scale = "count", width = 0.6, fill = "#5b5b5b") +  # Neutral fill
+    geom_violin(data = mcon_data, aes(x = pint, y = const_val, fill = data_type), 
+                scale = "count", width = 0.6) +  # Map fill to data_type
     geom_errorbar(data = mcon_data_summary, aes(x = pint, ymin = ymin, ymax = ymax), 
                   width = 0.2, linewidth = 0.7, color = "black") +
     ylab("Average Tightness") +
     xlab(x_axis_label) +  # Set the dynamic x-axis label here
     facet_wrap(~data_type, scales = "free_y") +  # Allow different y-axis scales
+    scale_fill_manual(values = c("Correlational network" = "#966FD6B3", "mgm" = "#008B8BB3")) +  # Custom colors
     theme(axis.title.x = element_text(), legend.position = "none")
   
   # Print the plot
@@ -682,7 +703,7 @@ Fig_3 = H1_2_1 / H1_2_2
 ggsave(here("Output", "Supplement", "Fig_3.jpg"), Fig_3, width = 12, height = 8, dpi = 300)
 ```
 
-#### R2
+### R2
 
 ```{r}
 # Initialize an empty list to store predictions
@@ -748,7 +769,7 @@ create_plot_2 <- function(data, type) {
     scale_color_manual(values = c("Low Group" = "#966FD6B3", "High Group" = "#008B8BB3")) + 
     theme_ipsum() +
     theme(
-      legend.position = "bottom",
+      legend.position = "none",  # Suppress the legend
       axis.title.y = element_text(size = 14, face = "bold"),
       plot.title = element_text(hjust = 0.5),
       legend.title = element_text(size = 12, face = "bold")
@@ -756,8 +777,7 @@ create_plot_2 <- function(data, type) {
     xlab("") +
     ylab("R2") +
     labs(
-      title = paste(type),
-      color = "Group"
+      title = paste(type)
     )
 }
 
@@ -772,22 +792,268 @@ sum_data <- plot_data %>%
   ungroup()
 
 # Create the bar plot
-sum_plot = ggplot(sum_data, aes(fill = group, y = total_value, x = type)) + 
+sum_plot <- ggplot(sum_data, aes(fill = group, y = total_value, x = type)) + 
   geom_bar(position = position_dodge(width = 0.9), stat = "identity") +
   scale_fill_manual(values = c("low" = "#966FD6B3", "high" = "#008B8BB3")) +
-  labs(title = "Mean R2 by group", y = "Mean R2", fill = "Group")
-
+  labs(title = "Mean R2 by group", y = "Mean R2", fill = "Group", x = NULL) +  # Remove the x-axis label "type"
+  coord_flip() +
+  scale_x_discrete(labels = c("pint" = "Political interest", "educ" = "Education")) +  # Change axis labels
+  theme_ipsum() +
+  theme(
+    plot.title = element_text(hjust = 0.5),  
+    legend.position = "bottom",  
+    panel.border = element_blank())
 
 # Save
-Figure_3 = plot_pint_r2 + sum_plot + plot_educ_r2
+Figure_3 <- (plot_pint_r2 + plot_educ_r2) / sum_plot + 
+  plot_layout(heights = c(4, 1))
+
 ggsave(here("Output", "Article", "Figure_3.png"), Figure_3, width = 12, height = 8, dpi = 300)
 ```
 
+### Moderations
+
+```{r}
+# Data prep
+mnm_educ_data = IPBS %>% 
+  select(L_R: ukrai, educ_cat) %>% 
+  mutate(educ_cat = case_when(
+    educ_cat == "Degree or more" ~ 1,
+    educ_cat == "Less than university" ~ 0)) %>% 
+  as.matrix()
+
+mnm_pint_data = IPBS %>% 
+  select(L_R: ukrai, pol_int) %>% 
+  mutate(pol_int = case_when(
+    pol_int %in% c(1,2) ~ 0,
+    pol_int %in% c(3,4) ~ 1
+  )) %>% 
+  as.matrix()
+
+# mnms
+mnm_educ = mgm(mnm_educ_data, type = c(rep("g", 19), "c"), level = c(rep(1, 19), 2),
+               moderators = 20, lambdaSel = "EBIC", ruleReg = "OR")
+
+mnm_pint = mgm(mnm_pint_data, type = c(rep("g", 19), "c"), level = c(rep(1, 19), 2),
+               moderators = 20, lambdaSel = "EBIC", ruleReg = "OR")
+
+# Inspecting interactions
+mnm_pint$interactions$indicator #61 pairwise, 23 moderations
+mnm_educ$interactions$indicator #72 pairwise, 9 moderations
+```
+
+
+```{r}
+# Multiplot
+
+# conditioning on the moderator
+educ_l_cond <- condition(mnm_educ, values = list("20" = 0))
+educ_h_cond <- condition(mnm_educ, values = list("20" = 1))
+
+pint_l_cond <- condition(mnm_pint, values = list("20" = 0))
+pint_h_cond <- condition(mnm_pint, values = list("20" = 1))
+```
+
+
+```{r}
+# Graph moderation coefficient
+
+if (fast_running==0) {
+  
+# bootstrap of moderation coefficients
+res_educ <- resample(object = mnm_educ, data = mnm_educ_data, nB = 100)
+res_pint <- resample(object = mnm_pint, data = mnm_pint_data, nB = 100)
+
+#Save Bootnets
+save(res_educ, file = here("Input", "Boots", "boots_mnm_educ.RData"))
+save(res_pint, file = here("Input", "Boots", "boots_mnm_pint.RData"))
+
+} else {
+  
+  #Boots
+load(file = here("Input", "Boots", "boots_mnm_educ.RData"))
+load(file = here("Input", "Boots", "boots_mnm_educ.RData"))
+
+}
+
+# Load the variable names from your datasets
+names_educ <- colnames(mnm_educ_data)
+names_pint <- colnames(mnm_pint_data)
+
+# Generate the dataframe for the education resample
+tab_mod_educ = data.frame(plotRes(res_educ, 
+                                  axis.ticks = c(-.1, 0, .1, .2, .3, .4, .5), 
+                                  axis.ticks.mod = c(-.1, -.05, 0, .05, .1), 
+                                  cex.label = 1, 
+                                  decreasing = TRUE,
+                                  labels = names_educ, 
+                                  layout.width.labels = 1,
+                                  table = TRUE))
+
+# Generate the dataframe for the political interest resample
+tab_mod_pint = data.frame(plotRes(res_pint, 
+                                  axis.ticks = c(-.1, 0, .1, .2, .3, .4, .5), 
+                                  axis.ticks.mod = c(-.1, -.05, 0, .05, .1), 
+                                  cex.label = 1, 
+                                  decreasing = TRUE,
+                                  labels = names_pint, 
+                                  layout.width.labels = 1,
+                                  table = TRUE))
+
+# Filter and arrange the education dataframe similar to tab_mod_df
+tab_mod_df_educ = tab_mod_educ %>%
+  select(Variable.A, Variable.B, Mod_Mean, Mod_qtl_low, Mod_qtl_high, Mod_propLtZ) %>% 
+  filter(Mod_propLtZ > 0.40) %>%  # Filter for moderation effect detected in more than 80% of bootstrap samples
+  arrange(desc(Mod_Mean))
+
+# Filter and arrange the political interest dataframe similar to tab_mod_df
+tab_mod_df_pint = tab_mod_pint %>%
+  select(Variable.A, Variable.B, Mod_Mean, Mod_qtl_low, Mod_qtl_high, Mod_propLtZ) %>% 
+  filter(Mod_propLtZ > 0.40) %>%  # Filter for moderation effect detected in more than 80% of bootstrap samples
+  arrange(desc(Mod_Mean))
+
+# Replace numeric values with corresponding variable names in education dataframe
+tab_mod_df_educ$Variable.A <- ifelse(tab_mod_df_educ$Variable.A >= 1 & tab_mod_df_educ$Variable.A <= length(names_educ),
+                                     names_educ[tab_mod_df_educ$Variable.A],
+                                     tab_mod_df_educ$Variable.A)
+
+tab_mod_df_educ$Variable.B <- ifelse(tab_mod_df_educ$Variable.B >= 1 & tab_mod_df_educ$Variable.B <= length(names_educ),
+                                     names_educ[tab_mod_df_educ$Variable.B],
+                                     tab_mod_df_educ$Variable.B)
+
+# Replace numeric values with corresponding variable names in political interest dataframe
+tab_mod_df_pint$Variable.A <- ifelse(tab_mod_df_pint$Variable.A >= 1 & tab_mod_df_pint$Variable.A <= length(names_pint),
+                                     names_pint[tab_mod_df_pint$Variable.A],
+                                     tab_mod_df_pint$Variable.A)
+
+tab_mod_df_pint$Variable.B <- ifelse(tab_mod_df_pint$Variable.B >= 1 & tab_mod_df_pint$Variable.B <= length(names_pint),
+                                     names_pint[tab_mod_df_pint$Variable.B],
+                                     tab_mod_df_pint$Variable.B)
+
+# You now have the tab_mod_df_educ and tab_mod_df_pint dataframes
+# These dataframes have a similar structure to tab_mod_df but are built from the resampling results
+
+```
+
+## H3
+
+```{r}
+#Enlarge objects
+shortnames = c("L_R","PTV_PD","PTV_FI","PTV_L","PTV_M5S","PTV_FDI","adopt","abort","eutha","marria","redis","flat_t","m_wage","cit_in","globa",     
+                "immig","big_go","pub_pri","ukrai","vote_cat")
+
+Totalgroup_comm <- list(
+  "Symbolic" = c(1:6),
+  "Operational" = c(7:19),
+  "Vote choice" = c(20)
+)
+
+Totalgroup_cols <- c("#966FD6B3","#008B8BB3", "#FFFF00")  
+
+# Data prep
+mnm_vote_data <- IPBS %>% 
+  select(L_R:ukrai, vote_cat) %>% 
+  mutate(vote_cat = case_when(
+    vote_cat == "Sin" ~ 1,
+    vote_cat == "M5S" ~ 2,
+    vote_cat == "Dx" ~ 3
+  )) %>% 
+  na.omit() %>% 
+  as.matrix()
+
+# Fit the mgm model
+mnm_vote <- mgm(
+  data = mnm_vote_data,
+  type = c(rep("g", 19), "c"),  
+  level = c(rep(1, 19), 3),     
+  moderators = 20,              
+  lambdaSel = "EBIC",           
+  ruleReg = "OR"                
+)
+
+# Conditioning the model on each level of vote_cat
+cond1 <- condition(object = mnm_vote, values = list('20' = 1))  # Sin
+cond2 <- condition(object = mnm_vote, values = list('20' = 2))  # M5S
+cond3 <- condition(object = mnm_vote, values = list('20' = 3))  # Dx
+
+# Initial plots to generate layouts
+Graph_cond_1 <- qgraph(cond1$pairwise$wadj)
+Graph_cond_2 <- qgraph(cond2$pairwise$wadj)
+Graph_cond_3 <- qgraph(cond3$pairwise$wadj)
+
+# Multiplot
+jpeg(here("Output", "Article", "mnm_vote_adjusted.jpg"), 
+     height = 6000, width = 6000, quality = 1000)  # Adjust image size as needed
+
+# Create a common layout based on all three conditions
+L <- averageLayout(Graph_cond_1, Graph_cond_2, Graph_cond_3, layout = "spring")
+
+# Matrix layout for the graphs (1 row, 3 columns)
+lmat <- matrix(1:3, 1, 3)
+
+# Start plotting
+layout(lmat, width = c(1, 1, 1))
+
+# Generate plots with consistent layout and edge fading based on weights
+set.seed(1)
+Graph_cond_1 <- qgraph(
+  cond1$pairwise$wadj, layout = L, fade = TRUE,  # Enable edge fading
+  labels = shortnames, vTrans = 255,  # Transparency setting
+  groups = Totalgroup_comm,  
+  color = Totalgroup_cols,  
+  legend = FALSE, title = "Left", title.cex = 12,
+  edge.color = cond1$pairwise$edgecolor_cb,  # Ensure edge colors reflect the weights
+  borders = TRUE, vsize = 10, esize = 15, 
+  edge.alpha = TRUE,  # Use edge.alpha to control transparency based on edge weight
+  cut = 0.05,  # Set a lower cut-off threshold
+  alpha = 0.7,  # Explicit alpha control to help edge fading
+  maximum = max(c(cond1$pairwise$wadj, cond2$pairwise$wadj, cond3$pairwise$wadj))  # Consistent scaling across all plots
+)
+
+set.seed(1)
+Graph_cond_2 <- qgraph(
+  cond2$pairwise$wadj, layout = L, fade = TRUE,  # Enable edge fading
+  labels = shortnames,  
+  groups = Totalgroup_comm, 
+  color = Totalgroup_cols, 
+  legend = FALSE, title = "M5S", title.cex = 12,
+  edge.color = cond2$pairwise$edgecolor_cb,  # Ensure edge colors reflect the weights
+  borders = TRUE, vsize = 10, esize = 15, 
+  edge.alpha = TRUE,  # Use edge.alpha to control transparency based on edge weight
+  cut = 0.05,  # Set a lower cut-off threshold
+  alpha = 0.7,  # Explicit alpha control to help edge fading
+  maximum = max(c(cond1$pairwise$wadj, cond2$pairwise$wadj, cond3$pairwise$wadj))  # Consistent scaling across all plots
+)
+
+set.seed(1)
+Graph_cond_3 <- qgraph(
+  cond3$pairwise$wadj, layout = L, fade = TRUE,  # Enable edge fading
+  labels = shortnames,  
+  groups = Totalgroup_comm, 
+  color = Totalgroup_cols, 
+  legend = FALSE, title = "Right", title.cex = 12,
+  edge.color = cond3$pairwise$edgecolor_cb,  # Ensure edge colors reflect the weights
+  borders = TRUE, vsize = 10, esize = 15, 
+  edge.alpha = TRUE,  # Use edge.alpha to control transparency based on edge weight
+  cut = 0.05,  # Set a lower cut-off threshold
+  alpha = 0.7,  # Explicit alpha control to help edge fading
+  maximum = max(c(cond1$pairwise$wadj, cond2$pairwise$wadj, cond3$pairwise$wadj))  # Consistent scaling across all plots
+)
+
+# Finish and save the plot
+dev.off()
+
+
+```
+```{r}
+
+```
 
 
 # OLD
 
 ## NCT analyses (OLD)
+
 ```{r}
 if (fast_running==0) {
 
@@ -833,7 +1099,7 @@ input_NCTgraph_r_m[upper.tri(input_NCTgraph_r_m)][which(NCT_r_m$einv.pvals$`p-va
 input_NCTgraph_r_m <- forceSymmetric(input_NCTgraph_r_m)
 
 nct_r_m = qgraph(input_NCTgraph_r_m, edge.labels = TRUE,
-                  layout = "spring", theme = "Borkulo", 
+                  layout = "spring", 
                   labels = shortnames, nodeNames = longnames,
                   groups=Totalgroup_comm, color= Totalgroup_cols,
                   cut = 0.10, maximum = 1, 
@@ -846,7 +1112,7 @@ input_NCTgraph_l_r[upper.tri(input_NCTgraph_l_r)][which(NCT_l_r$einv.pvals$`p-va
 input_NCTgraph_l_r <- forceSymmetric(input_NCTgraph_l_r)
 
 nct_l_r = qgraph(input_NCTgraph_l_r, edge.labels = TRUE,
-                  layout = "spring", theme = "Borkulo", 
+                  layout = "spring",  
                   labels = shortnames, nodeNames = longnames,
                   groups=Totalgroup_comm, color= Totalgroup_cols,
                   cut = 0.10, maximum = 1, 
@@ -859,7 +1125,7 @@ input_NCTgraph_l_m[upper.tri(input_NCTgraph_l_m)][which(NCT_l_m$einv.pvals$`p-va
 input_NCTgraph_l_m <- forceSymmetric(input_NCTgraph_l_m)
 
 nct_l_m = qgraph(input_NCTgraph_l_m, edge.labels = TRUE,
-                  layout = "spring", theme = "Borkulo", 
+                  layout = "spring",  
                   labels = shortnames, nodeNames = longnames,
                   groups=Totalgroup_comm, color= Totalgroup_cols,
                   cut = 0.10, maximum = 1, 
@@ -878,29 +1144,29 @@ lo <- layout(lmat, width = c(1, 1))
 
 set.seed(1)
 nct_r_m = qgraph(input_NCTgraph_r_m, edge.labels = TRUE,
-                  layout = L, theme = "Borkulo", title = "Right - 5SM",
+                  layout = L,  title = "Right - 5SM",
                   title.cex = 3, labels = shortnames, nodeNames = longnames,
                   groups=Totalgroup_comm, color= Totalgroup_cols, edge.width = 1.9,
-                  cut = 0.10, maximum = 1, vTrans = 100, edge.label.cex = 1.2,
+                  cut = 0.10, maximum = 1, vTrans = 255, edge.label.cex = 1.2,
                   details = FALSE, vsize=9, label.cex=1.3,
                   legend = FALSE, borders = TRUE)
 
 
 set.seed(1)
 nct_l_r = qgraph(input_NCTgraph_l_r, edge.labels = TRUE,
-                  layout = L, theme = "Borkulo", title = "Left - Right",
+                  layout = L,  title = "Left - Right",
                   title.cex = 3, labels = shortnames, nodeNames = longnames,
                   groups=Totalgroup_comm, color= Totalgroup_cols, edge.width = 1.9,
-                  cut = 0.10, maximum = 1, vTrans = 100, edge.label.cex = 1.2,
+                  cut = 0.10, maximum = 1, vTrans = 255, edge.label.cex = 1.2,
                   details = FALSE, vsize=9, label.cex=1.3,
                   legend = FALSE, borders = TRUE)
 
 set.seed(1)
 nct_l_m = qgraph(input_NCTgraph_l_m, edge.labels = TRUE,
-                  layout = L, theme = "Borkulo", title = "Left - 5SM",
+                  layout = L,  title = "Left - 5SM",
                   title.cex = 3, labels = shortnames, nodeNames = longnames,
                   groups=Totalgroup_comm, color= Totalgroup_cols, edge.width = 1.9,
-                  cut = 0.10, maximum = 1, vTrans = 100, edge.label.cex = 1.2,
+                  cut = 0.10, maximum = 1, vTrans = 255, edge.label.cex = 1.2,
                   details = FALSE, vsize=9, label.cex=1.3,
                   legend = FALSE, borders = TRUE)
 
