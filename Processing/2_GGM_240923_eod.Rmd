@@ -90,7 +90,7 @@ att_net = cor_auto(att, npn.SKEPTIC = T, #Nonparanormal transformation (HUGE)
                         verbose = FALSE)
 
 #square the matrix
-att_net = att_net^2
+att_net = abs(att_net)
 
 #plot
 qgraph(att_net,
@@ -122,11 +122,11 @@ generate_network_plots <- function(low_data, high_data, shortnames, longnames, g
   
   # Fit GGM for low data
   low_data_net <- cor_auto(low_data, npn.SKEPTIC = TRUE, ordinalLevelMax = 7, forcePD = TRUE, missing = "pairwise", verbose = FALSE)
-  low_data_net <- low_data_net^2  # Square the matrix
+  low_data_net <- abs(low_data_net)  # Square the matrix
   
   # Fit GGM for high data
   high_data_net <- cor_auto(high_data, npn.SKEPTIC = TRUE, ordinalLevelMax = 7, forcePD = TRUE, missing = "pairwise", verbose = FALSE)
-  high_data_net <- high_data_net^2  # Square the matrix
+  high_data_net <- abs(high_data_net)  # Square the matrix
   
   # Save plot for low data
   set.seed(1)
@@ -192,7 +192,7 @@ generate_network_plots(
   graph_mgm <- qgraph(mgm_att$pairwise$wadj, layout = 'spring',
                       labels = shortnames, nodeNames = longnames,  
                       groups = Totalgroup_comm, color = Totalgroup_cols, 
-                      legend = T, legend.cex = 0.33, title = "mgm",
+                      legend = F, legend.cex = 0.33, title = "mgm",
                       edge.color = mgm_att$pairwise$edgecolor_cb, vTrans = 255,
                       borders = T, vsize = 7.0, esize = 15, GLratio = 2,
                       pie = pred_att$errors[,2], pieColor = rep('#FFFF00', length(shortnames)),
@@ -554,17 +554,37 @@ load(file = here("Input", "Boots", "boots_pint_2_2_pc.RData"))
 ## Extract info from boots
 
 ```{r}
-# Function to process each dataset
+# function for cor objects
 process_boots_data <- function(df_boot) {
   # Extract the matrices
   matrix_list <- lapply(1:10000, function(i) {
     df_boot[["boots"]][[i]][["graph"]]
   })
   
-  # Calculate the mean of the squared matrix for each matrix
+  # Calculate the mean of non-zero values in the absolute value matrix for each matrix
   mean_values <- sapply(matrix_list, function(mat) {
-    squared_matrix <- mat^2
-    mean(squared_matrix)
+    abs_matrix <- abs(mat)
+    # Extract non-zero values and calculate the mean
+    non_zero_values <- abs_matrix[abs_matrix != 0]
+    mean(non_zero_values)
+  })
+  
+  return(mean_values)
+}
+
+# Function to process boot of mgm objects with absolute values
+process_boots_data_pc <- function(df_boot) {
+  # Extract the matrices
+  matrix_list <- lapply(1:10000, function(i) {
+    df_boot[["boots"]][[i]][["graph"]]
+  })
+  
+  # Calculate the mean of non-zero values in the absolute value of each matrix
+  mean_values <- sapply(matrix_list, function(mat) {
+    abs_matrix <- abs(mat)
+    # Extract non-zero values and calculate the mean
+    non_zero_values <- abs_matrix[abs_matrix != 0]
+    mean(non_zero_values)
   })
   
   return(mean_values)
@@ -596,21 +616,21 @@ cons_educ_h <- process_boots_data(df.boot_educ_h)
 ########
 
 # Apply the function to pint dataset
-cons_pint_l_pc <- process_boots_data(df.boot_pint_l_pc)
-cons_pint_m_pc <- process_boots_data(df.boot_pint_m_pc)
-cons_pint_h_pc <- process_boots_data(df.boot_pint_h_pc)
+cons_pint_l_pc <- process_boots_data_pc(df.boot_pint_l_pc)
+cons_pint_m_pc <- process_boots_data_pc(df.boot_pint_m_pc)
+cons_pint_h_pc <- process_boots_data_pc(df.boot_pint_h_pc)
 
 # Apply the function to pint 2_1 dataset
-cons_pint_l_2_1_pc <- process_boots_data(df.boot_pint_l_2_1_pc)
-cons_pint_h_2_1_pc <- process_boots_data(df.boot_pint_h_2_1_pc)  
+cons_pint_l_2_1_pc <- process_boots_data_pc(df.boot_pint_l_2_1_pc)
+cons_pint_h_2_1_pc <- process_boots_data_pc(df.boot_pint_h_2_1_pc)  
 
 # Apply the function to pint 2_2 dataset
-cons_pint_l_2_2_pc <- process_boots_data(df.boot_pint_l_2_2_pc)
-cons_pint_h_2_2_pc <- process_boots_data(df.boot_pint_h_2_2_pc)  
+cons_pint_l_2_2_pc <- process_boots_data_pc(df.boot_pint_l_2_2_pc)
+cons_pint_h_2_2_pc <- process_boots_data_pc(df.boot_pint_h_2_2_pc)  
 
 # Apply the function to educ dataset
-cons_educ_l_pc <- process_boots_data(df.boot_educ_l_pc)
-cons_educ_h_pc <- process_boots_data(df.boot_educ_h_pc)
+cons_educ_l_pc <- process_boots_data_pc(df.boot_educ_l_pc)
+cons_educ_h_pc <- process_boots_data_pc(df.boot_educ_h_pc)
 ```
 
 
@@ -700,8 +720,8 @@ H1_2_1 = create_plot(cons_pint_l_2_1, NULL, cons_pint_h_2_1, cons_pint_l_2_1_pc,
   theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
 
 # Create and print the H1_pint_2_2 plot (with two levels)
-H1_2_2 = create_plot(cons_pint_l_2_2, NULL, cons_pint_h_2_2, cons_pint_l_2_2_pc, NULL, cons_pint_h_2_2_pc, "Political Interest - Option 2") +
-  ggtitle("Political Interest - Option 2") + 
+H1_2_2 = create_plot(cons_pint_l_2_2, NULL, cons_pint_h_2_2, cons_pint_l_2_2_pc, NULL, cons_pint_h_2_2_pc, "Political Interest") +
+  ggtitle("Political Interest") + 
   theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
 
 # Create and print the H2_educ plot (with two levels and x-axis label "Education")
@@ -713,12 +733,12 @@ H2 = create_plot(cons_educ_l, NULL, cons_educ_h, cons_educ_l_pc, NULL, cons_educ
 
 ```{r}
 # Figure_2 multiplot
-Figure_2 = H1 / H2
+Figure_2 = H1_2_2 / H2
 
 ggsave(here("Output", "Article", "Figure_2.jpg"), Figure_2, width = 12, height = 8, dpi = 300)
 
 # Fig_3 multiplot
-Fig_3 = H1_2_1 / H1_2_2
+Fig_3 = H1 / H1_2_1
 
 ggsave(here("Output", "Supplement", "Fig_3.jpg"), Fig_3, width = 12, height = 8, dpi = 300)
 ```
@@ -857,8 +877,8 @@ aspl_from_boots_with_ci <- function(df_boot) {
 }
 
 # Apply the updated function to datasets for political interest and education
-#aspl_pint_l_2_1_pc <- aspl_from_boots_with_ci(df.boot_pint_l_2_1_pc)
-#aspl_pint_h_2_1_pc <- aspl_from_boots_with_ci(df.boot_pint_h_2_1_pc)
+#aspl_pint_l_2_2_pc <- aspl_from_boots_with_ci(df.boot_pint_l_2_2_pc)
+#aspl_pint_h_2_2_pc <- aspl_from_boots_with_ci(df.boot_pint_h_2_2_pc)
 #
 #aspl_educ_l_pc <- aspl_from_boots_with_ci(df.boot_educ_l_pc)
 #aspl_educ_h_pc <- aspl_from_boots_with_ci(df.boot_educ_h_pc)
@@ -870,19 +890,19 @@ load(file = here("Input", "ASPL", "aspl_pint_h.RData"))
 load(file = here("Input", "ASPL", "aspl_pint_l.RData"))
 
 # Save
-save(aspl_pint_l_2_1_pc, file = here("Input", "ASPL", "aspl_pint_l.RData"))
-save(aspl_pint_h_2_1_pc, file = here("Input", "ASPL", "aspl_pint_h.RData"))
+save(aspl_pint_l_2_2_pc, file = here("Input", "ASPL", "aspl_pint_l.RData"))
+save(aspl_pint_h_2_2_pc, file = here("Input", "ASPL", "aspl_pint_h.RData"))
 
 save(aspl_educ_l_pc, file = here("Input", "ASPL", "aspl_educ_l.RData"))
 save(aspl_educ_h_pc, file = here("Input", "ASPL", "aspl_educ_h.RData"))
 
 # Prepare the data for box plot (using all ASPL values, including outliers)
 plot_data <- data.frame(
-  type = c(rep("pint", length(aspl_pint_l_2_1_pc$aspl_values)), rep("pint", length(aspl_pint_h_2_1_pc$aspl_values)),
+  type = c(rep("pint", length(aspl_pint_l_2_2_pc$aspl_values)), rep("pint", length(aspl_pint_h_2_2_pc$aspl_values)),
            rep("educ", length(aspl_educ_l_pc$aspl_values)), rep("educ", length(aspl_educ_h_pc$aspl_values))),
-  group = c(rep("low", length(aspl_pint_l_2_1_pc$aspl_values)), rep("high", length(aspl_pint_h_2_1_pc$aspl_values)),
+  group = c(rep("low", length(aspl_pint_l_2_2_pc$aspl_values)), rep("high", length(aspl_pint_h_2_2_pc$aspl_values)),
             rep("low", length(aspl_educ_l_pc$aspl_values)), rep("high", length(aspl_educ_h_pc$aspl_values))),
-  aspl_values = c(aspl_pint_l_2_1_pc$aspl_values, aspl_pint_h_2_1_pc$aspl_values, 
+  aspl_values = c(aspl_pint_l_2_2_pc$aspl_values, aspl_pint_h_2_2_pc$aspl_values, 
                   aspl_educ_l_pc$aspl_values, aspl_educ_h_pc$aspl_values)
 )
 
@@ -1741,23 +1761,24 @@ mod_merged <- bind_rows(signed_mod_pint, signed_mod_educ, signed_mod_vote)%>%
 ```
 
 ```{r}
-# Plot supplement
-
 # Plot the graph with facet wrap by moderator
 plot_mod_merged <- ggplot(mod_merged) +
   # Plot predicted0 with color #966FD6B3
-  geom_point(aes(x = Node, y = predicted0, color = "Predicted 0"), size = 3) +
+  geom_point(aes(x = Node, y = predicted0, color = "Low group (Left)"), size = 3) +
   
   # Plot predicted1 with color #008B8BB3
-  geom_point(aes(x = Node, y = predicted1, color = "Predicted 1"), size = 3) +
+  geom_point(aes(x = Node, y = predicted1, color = "High group (Right)"), size = 3) +
   
   # Segment lines between the two points (predicted0 and predicted1)
   geom_segment(aes(x = Node, xend = Node, y = predicted0, yend = predicted1), color = "grey") +
   
+  # Add a reference line at y = 0
+  geom_hline(yintercept = 0, color = "black", linetype = "dashed") +  # Add reference line
+  
   coord_flip() +  # Flip the axes
   
   # Customize the color scale
-  scale_color_manual(values = c("Predicted 0" = "#966FD6B3", "Predicted 1" = "#008B8BB3")) +
+  scale_color_manual(values = c("Low group (Left)" = "#966FD6B3", "High group (Right)" = "#008B8BB3")) +
   
   # Facet by moderator
   facet_wrap(~ moderator, scales = "free_y") +  # Ensure facets by moderator
@@ -1779,6 +1800,7 @@ plot_mod_merged <- ggplot(mod_merged) +
 # Display the plot
 print(plot_mod_merged)
 
+# Save the plot
 ggsave(here("Output", "Supplement", "Moderation_coeff_full.jpg"), plot_mod_merged, width = 12, height = 12, dpi = 300)
 
 ```
@@ -1833,120 +1855,210 @@ ggsave(here("Output", "Article", "Figure_4.jpg"), plot_mod_merged_filtered, widt
 ```
 
 
-# OLD
-
-# Network descriptives
+# Descriptives
 This code replicates descriptives of the networks used throughout the article
 
 ```{r}
-#Figure 1
+#Figure 1 (2 in the article)
 
-## Min edge weight
-min_fig1 = att_net %>% 
+## cor net
+
+# Remove diagonal elements (self-loops) if necessary
+att_net_no_diag = att_net
+diag(att_net_no_diag) <- NA
+
+## Min edge weight (excluding diagonal elements)
+min_fig1 = att_net_no_diag %>% 
   as.vector() %>%
-  min()
+  min(na.rm = TRUE)
 
-## Max edge weight
-max_fig1 = att_net %>% 
-  as.vector() 
-max_fig1 = max_fig1[max_fig1 != 1]
-max_fig1 = max_fig1 %>%
- max()
+## Max edge weight (excluding diagonal elements and edge weight of 1)
+max_fig1 = att_net_no_diag %>% 
+  as.vector()
+max_fig1 = max_fig1[!is.na(max_fig1) & max_fig1 != 1]
+max_fig1 = max(max_fig1, na.rm = TRUE)
 
-
-## Node strength
+## Node strength (using the original matrix if diagonals are meaningful)
 strength_fig1 = centrality(att_net)
 min_st_fig1 = min(strength_fig1$OutDegree)
 max_st_fig1 = max(strength_fig1$OutDegree)
 
-## Constraint
-const_fig1 = mean(att_net)
+## Constraint (using the full matrix)
+const_fig1 = mean(abs(att_net), na.rm = TRUE)
 
-## N° of zero cells
-zerofig1 = sum(att_net <= 0.001)
+## Number of non-zero edges (ignoring diagonal elements if necessary)
+nonzerofig1 = sum(att_net_no_diag != 0, na.rm = TRUE)
 
-## N° of non zero edges
-nonzerofig1 = sum(att_net != 0)
+# Count edges lower than 0.001
+entries_below_001 = sum(att_net_no_diag < 0.001, na.rm = TRUE)
 ```
 
 ```{r}
-#Figure 2
+# Figure 1 right panel (2 in the artilce)
 
-## Point estimate and ci of each subgroup
-mcon_pint_summary
-mcon_edu_summary
-```
+## mgm
 
-```{r}
-#Figure 3
+#signed matrix
+mat_mgm_att = mgm_att$pairwise$wadj*mgm_att$pairwise$signs
 
-## N° of non zero edges
-n_left = (sum(vote_l_data_net != 0))/2
-n_mov = (sum(vote_m_data_net != 0))/2
-n_right = (sum(vote_r_data_net != 0))/2
+# Remove diagonal elements (self-loops) if necessary
+mat_mgm_att_no_diag = mat_mgm_att
+diag(mat_mgm_att_no_diag) <- NA
 
+## Min edge weight (excluding diagonal elements)
+min_fig1 = mat_mgm_att_no_diag %>% 
+  as.vector() %>%
+  min(na.rm = TRUE)
 
-## Density of each plot (Sum of the Absolute Value of Each Cell of a Matrix)
-d_left = sum(abs(vote_l_data_net))
-d_mov = sum(abs(vote_m_data_net))
-d_right = sum(abs(vote_r_data_net))
-
-```
-
-```{r}
-#NCT
-
-## N° edges differing between each network pair
-nnct_rm =  sum(input_NCTgraph_r_m != 0)
-nnct_lr =  sum(input_NCTgraph_l_r != 0)
-nnct_lm =  sum(input_NCTgraph_l_m != 0)
-
-max_rm = max(input_NCTgraph_r_m)
-max_lr = max(input_NCTgraph_l_r)
-max_lm =  max(input_NCTgraph_l_m)
-```
-
-```{r}
-#Figure 4
-
-## average value of absolute edge weight in each vote bel syst (NON 0)
-#left
-avg_edg_l = vote_l_data_net %>% 
-  abs() %>% 
+## Max edge weight (excluding diagonal elements and edge weight of 1)
+max_fig1 = mat_mgm_att_no_diag %>% 
   as.vector()
+max_fig1 = max_fig1[!is.na(max_fig1) & max_fig1 != 1]
+max_fig1 = max(max_fig1, na.rm = TRUE)
 
-avg_edg_l = avg_edg_l[avg_edg_l != 0]
-avg_edg_l = avg_edg_l[avg_edg_l != 1]
+## Node strength (using the original matrix if diagonals are meaningful)
+strength_fig1 = centrality(mgm_att$pairwise$wadj)
 
-avg_edg_l = mean(avg_edg_l)
+## Constraint (using the full matrix)
+const_fig1 = mean(abs(mgm_att$pairwise$wadj[!is.na(mgm_att$pairwise$wadj) & mgm_att$pairwise$wadj != 0]))
 
-#right
-avg_edg_m = vote_m_data_net %>% 
-  abs() %>% 
-  as.vector()
+## Number of non-zero edges (ignoring diagonal elements if necessary)
+zerofig1 = (sum(is.na(mgm_att$pairwise$signs)) - 19) / 2
 
-avg_edg_m = avg_edg_m[avg_edg_m != 0]
-avg_edg_m = avg_edg_m[avg_edg_m != 1]
-
-avg_edg_m = mean(avg_edg_m)
-
-#Mov
-avg_edg_r = vote_r_data_net %>% 
-  abs() %>% 
-  as.vector()
-
-avg_edg_r = avg_edg_r[avg_edg_r != 0]
-avg_edg_r = avg_edg_r[avg_edg_r != 1]
-
-avg_edg_r = mean(avg_edg_r)
-
-# Number of edges differing between matrices
-ndiff_rm = (sum(vote_r_data_net != vote_m_data_net))/2
-ndiff_lr = (sum(vote_l_data_net != vote_r_data_net))/2
-ndiff_lm = (sum(vote_l_data_net != vote_m_data_net))/2
-
-#theorethical max n of edges 
-tmax = 19*18/2
+# Count edges lower than 0.001
+entries_no0 = sum(mgm_att$pairwise$wadj != 0, na.rm = TRUE)
 ```
 
+
+```{r}
+# Figure 2 (3 in the article)
+
+# Function to calculate and print the mean and bootstrapped CIs
+print_summary_stats <- function(df_l, df_m = NULL, df_h, df_l_pc, df_m_pc = NULL, df_h_pc) {
+  if (!is.null(df_m)) {
+    pint <- c(rep("Low", 10000), rep("Medium", 10000), rep("High", 10000))
+    const_val <- c(df_l, df_m, df_h, df_l_pc, df_m_pc, df_h_pc)
+    data_type <- rep(c("Correlational network", "mgm"), each = 30000)
+    pint_vector <- rep(pint, 2)
+  } else {
+    pint <- c(rep("Low", 10000), rep("High", 10000))
+    const_val <- c(df_l, df_h, df_l_pc, df_h_pc)
+    data_type <- rep(c("Correlational network", "mgm"), each = 20000)
+    pint_vector <- rep(pint, 2)
+  }
+  
+  mcon_data <- data.frame(
+    const_val = const_val,
+    pint = pint_vector,
+    data_type = data_type
+  )
+  
+  # Calculate summary statistics
+  mcon_data_summary <- mcon_data %>%
+    group_by(pint, data_type) %>%
+    summarise(
+      mean_val = mean(const_val),
+      ci_lower = quantile(const_val, 0.025),
+      ci_upper = quantile(const_val, 0.975)
+    )
+  
+  # Print the summary
+  print(mcon_data_summary)
+}
+
+# print desc
+print_summary_stats(cons_pint_l, cons_pint_m, cons_pint_h, cons_pint_l_pc, cons_pint_m_pc, cons_pint_h_pc)
+
+# for two levels df:
+print_descriptives <- function(cons_pint_h_2_2, cons_pint_h_2_2_pc, cons_pint_l_2_2, cons_pint_l_2_2_pc) {
+  # Combine the data
+  cons_data <- data.frame(
+    const_val = c(cons_pint_h_2_2, cons_pint_h_2_2_pc, cons_pint_l_2_2, cons_pint_l_2_2_pc),
+    group = rep(c("cons_pint_h_2_2", "cons_pint_h_2_2_pc", "cons_pint_l_2_2", "cons_pint_l_2_2_pc"), 
+                each = length(cons_pint_h_2_2))
+  )
+  
+  # Calculate summary statistics
+  cons_data_summary <- cons_data %>%
+    group_by(group) %>%
+    summarise(
+      mean_val = mean(const_val),
+      sd_val = sd(const_val),
+      min_val = min(const_val),
+      max_val = max(const_val),
+      ci_lower = quantile(const_val, 0.025),
+      ci_upper = quantile(const_val, 0.975)
+    )
+  
+  # Print the summary
+  print(cons_data_summary)
+}
+
+# Example usage (assuming cons_pint_h_2_2, cons_pint_h_2_2_pc, cons_pint_l_2_2, and cons_pint_l_2_2_pc are defined)
+print_descriptives(cons_pint_h_2_2, cons_pint_h_2_2_pc, cons_pint_l_2_2, cons_pint_l_2_2_pc)
+
+```
+
+```{r}
+# Figure 3 (4 in the article): ASPL
+# Function to print descriptive statistics for ASPL values
+print_aspl_descriptives <- function(aspl_data) {
+  aspl_values <- aspl_data$aspl_values
+  
+  # Calculate the mean, standard deviation, quartiles, and bootstrapped confidence intervals
+  mean_val <- mean(aspl_values, na.rm = TRUE)
+  sd_val <- sd(aspl_values, na.rm = TRUE)
+  quartiles <- quantile(aspl_values, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
+  ci_lower <- quantile(aspl_values, 0.025, na.rm = TRUE)
+  ci_upper <- quantile(aspl_values, 0.975, na.rm = TRUE)
+  
+  # Print the results
+  cat("Descriptive Statistics for ASPL:\n")
+  cat("Mean:", mean_val, "\n")
+  cat("Standard Deviation:", sd_val, "\n")
+  cat("25th Percentile (Q1):", quartiles[1], "\n")
+  cat("50th Percentile (Median):", quartiles[2], "\n")
+  cat("75th Percentile (Q3):", quartiles[3], "\n")
+  cat("Lower 95% CI:", ci_lower, "\n")
+  cat("Upper 95% CI:", ci_upper, "\n")
+}
+
+# print desc
+print_aspl_descriptives(aspl_pint_l_2_2_pc)
+print_aspl_descriptives(aspl_pint_h_2_2_pc)
+print_aspl_descriptives(aspl_educ_l_pc)
+print_aspl_descriptives(aspl_educ_h_pc)
+
+```
+
+```{r}
+# Figure 3 (4 in the article): R2 sums
+# Function to print descriptive statistics for R² values
+print_r2_descriptives <- function(r2_data) {
+  r2_values <- r2_data$r2_values
+  
+  # Calculate the mean, standard deviation, quartiles, and bootstrapped confidence intervals
+  mean_val <- mean(r2_values, na.rm = TRUE)
+  sd_val <- sd(r2_values, na.rm = TRUE)
+  quartiles <- quantile(r2_values, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
+  ci_lower <- quantile(r2_values, 0.025, na.rm = TRUE)
+  ci_upper <- quantile(r2_values, 0.975, na.rm = TRUE)
+  
+  # Print the results
+  cat("Descriptive Statistics for R²:\n")
+  cat("Mean:", mean_val, "\n")
+  cat("Standard Deviation:", sd_val, "\n")
+  cat("25th Percentile (Q1):", quartiles[1], "\n")
+  cat("50th Percentile (Median):", quartiles[2], "\n")
+  cat("75th Percentile (Q3):", quartiles[3], "\n")
+  cat("Lower 95% CI:", ci_lower, "\n")
+  cat("Upper 95% CI:", ci_upper, "\n")
+}
+
+# Example usage with your R² objects
+print_r2_descriptives(r2_pint_l_2_1_pc)
+print_r2_descriptives(r2_pint_h_2_1_pc)
+print_r2_descriptives(r2_educ_l_pc)
+print_r2_descriptives(r2_educ_h_pc)
+```
 
