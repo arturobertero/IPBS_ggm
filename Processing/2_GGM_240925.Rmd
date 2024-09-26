@@ -695,7 +695,7 @@ plot <- ggplot() +
   geom_errorbar(data = mcon_data_summary, aes(x = pint, ymin = ymin, ymax = ymax), 
                 width = 0.2, linewidth = 0.7, color = "black") +
   theme_ipsum() +
-  ylab("Average Tightness") +
+  ylab("Mean Constraint") +
   xlab(x_axis_label) +  # Set the dynamic x-axis label here
   facet_wrap(~data_type, scales = "free_y") +  # Allow different y-axis scales
   scale_fill_manual(values = c("Correlational network" = "#966FD6B3", "mgm" = "#008B8BB3")) +  # Custom colors
@@ -715,8 +715,8 @@ H1 = create_plot(cons_pint_l, cons_pint_m, cons_pint_h, cons_pint_l_pc, cons_pin
   theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
 
 # Create and print the H1_pint_2_1 plot (with two levels)
-H1_2_1 = create_plot(cons_pint_l_2_1, NULL, cons_pint_h_2_1, cons_pint_l_2_1_pc, NULL, cons_pint_h_2_1_pc, "Political Interest - Option 1") +
-  ggtitle("Political Interest - Option 1") + 
+H1_2_1 = create_plot(cons_pint_l_2_1, NULL, cons_pint_h_2_1, cons_pint_l_2_1_pc, NULL, cons_pint_h_2_1_pc, "Political Interest - Option 2") +
+  ggtitle("Political Interest - Option 2") + 
   theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
 
 # Create and print the H1_pint_2_2 plot (with two levels)
