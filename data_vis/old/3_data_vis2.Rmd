@@ -13,6 +13,7 @@ library(ggplot2)
 library(dplyr)
 library(here)
 library(patchwork)
+library(hrbrthemes)
 ```
 
 # Constraint versus not-constrained
@@ -26,11 +27,18 @@ df <- data.frame(Min_wage, Adopt)
 
 # Create a scatterplot of PTV_PD vs. Big_gov
 plot_1 <- ggplot(df, aes(x = Min_wage, y = Adopt)) +
-  geom_point(size = 1) +
-  labs(x = "Support for minimum wage", y = "Support for adoption of homosex couples", 
-       title = "Low constraint") +
+  geom_point(size = 0.5) +
+  labs(x = "Support for minimum wage", 
+       y = "Support for adoption of homosexual couples", 
+       title = "Low Constraint") +
   scale_x_continuous(breaks = c(2, 4, 6, 8, 10)) +
-  scale_y_continuous(breaks = c(2, 4, 6, 8, 10))
+  scale_y_continuous(breaks = c(2, 4, 6, 8, 10)) +
+  theme_ipsum(base_size = 14) +  # Applying theme_ipsum and adjusting base text size for readability
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_text(size = 14),  # Adjusting axis title size
+    axis.text = element_text(size = 12)    # Adjusting axis label size
+  )
 ```
 
 ```{r}
@@ -49,313 +57,111 @@ df <- data.frame(Min_wage = data_matrix[, 1], Adopt = data_matrix[, 2])
 
 # Create a scatterplot of Min_wage vs. Adopt
 plot_2 <- ggplot(df, aes(x = Min_wage, y = Adopt)) +
-  geom_point(size = 1) +
-  labs(x = "Support for minimum wage", y = "Support for adoption of homosex couples",
-       title = "High constraint") +
+  geom_point(size = 0.5) +
+  labs(x = "Support for minimum wage", 
+       y = "Support for adoption of homosexual couples",
+       title = "High Constraint") +
   scale_x_continuous(breaks = c(2, 4, 6, 8, 10)) +
-  scale_y_continuous(breaks = c(2, 4, 6, 8, 10))
+  scale_y_continuous(breaks = c(2, 4, 6, 8, 10)) +
+  theme_ipsum(base_size = 14) +  # Applying theme_ipsum and adjusting base text size for readability
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_text(size = 14),  # Adjusting axis title size
+    axis.text = element_text(size = 12)    # Adjusting axis label size
+  )
 ```
 
 ```{r}
-plottt = plot_1 + plot_spacer() + plot_2 + plot_layout(widths = c(4, 0.5 ,4))
-ggsave(here("data_vis",  "const.jpg"), plottt, width = 18, height = 9)
+# Adjust the overall size to fit half a Word page width
+plottt = plot_1 + plot_spacer() + plot_2 + plot_layout(widths = c(4, 0.5, 4))
+
+# Save the combined plot with appropriate size (scaled to fit half of a Word page width)
+ggsave(here("data_vis", "const.jpg"), plottt, width = 6.5, height = 6.5, dpi = 300)
 ```
 
 
-# High tight low consensus
+# 4 panels
 
 ```{r}
-#high_low
-# Generate random values for Variable1 and Variable2
-n <- 1000  # Number of rows
-mean1 <- 5  # Mean value for Variable1
-mean2 <- 5  # Mean value for Variable2
-correlation_target <- 0.65  # Target correlation when Variable3 is 0
+# Function to generate data
+generate_data <- function(n, mean1, mean2, cor_target_0, cor_target_1) {
+  sigma_0 <- matrix(c(1, cor_target_0, cor_target_0, 1), nrow = 2)
+  data_cor_0 <- mvrnorm(n, mu = c(mean1, mean2), Sigma = sigma_0)
+  data_cor_0 <- pmax(pmin(data_cor_0, 10), 0)
+  
+  sigma_1 <- matrix(c(1, cor_target_1, cor_target_1, 1), nrow = 2)
+  data_cor_1 <- mvrnorm(n, mu = c(mean1, mean2), Sigma = sigma_1)
+  data_cor_1 <- pmax(pmin(data_cor_1, 10), 0)
+  
+  Variable3 <- sample(0:1, n, replace = TRUE)
+  data <- data.frame(
+    Min_wage = ifelse(Variable3 == 0, data_cor_0[, 1], data_cor_1[, 1]),
+    Adopt = ifelse(Variable3 == 0, data_cor_0[, 2], data_cor_1[, 2]),
+    Relig = Variable3
+  )
+  return(data)
+}
 
-# Generate correlated data for Variable1 and Variable2 when Variable3 is 0
-sigma <- matrix(c(1, correlation_target, correlation_target, 1), nrow = 2)
-data_correlated_0 <- mvrnorm(n, mu = c(mean1, mean2), Sigma = sigma)
+# Function to create scatterplots with smaller annotation text
+create_scatterplot <- function(data, title_text, cor_default, cor_relig0, cor_relig1) {
+  scatter_plot <- ggplot(data, aes(x = Min_wage, y = Adopt, color = factor(Relig))) +
+    geom_point(size = 0.3) +
+    geom_smooth(method = lm, se = T, color = "#5b5b5b", aes(group = 1)) +
+    geom_smooth(data = subset(data, Relig == 0), method = lm, se = T, color = "#00BFFF", aes(group = 2)) +
+    geom_smooth(data = subset(data, Relig == 1), method = lm, se = T, color = "#E4717A", aes(group = 3)) +
+    labs(x = "Support for minimum wage", y = "Support for adoption of homosexual couples", title = title_text) +
+    scale_color_manual(values = c("0" = "#00BFFF", "1" = "#E4717A"), labels = c("0" = "No", "1" = "Yes")) +
+    guides(color = guide_legend(title = "Relig")) +
+    theme_ipsum(base_size = 14) +
+    theme(plot.title = element_text(size = 16, face = "bold"),
+          axis.title = element_text(size = 14),
+          axis.text = element_text(size = 12)) +
+    annotate("text", x = max(data$Min_wage), y = max(data$Adopt), 
+             label = sprintf("r = %.2f\nr (if Relig = 0) = %.2f\nr (if Relig = 1) = %.2f", cor_default, cor_relig0, cor_relig1), 
+             vjust = 0.8, hjust = 1, size = 3)  # Reduced annotation text size from 4 to 3
+  return(scatter_plot)
+}
 
-# Ensure values are within the range [0, 10]
-data_correlated_0 <- pmax(pmin(data_correlated_0, 10), 0)
+# Generate data and calculate correlations for different conditions
+data_high_low <- generate_data(1000, 5, 5, 0.65, -0.65)
+data_low_low <- generate_data(1000, 5, 5, 0.15, -0.15)
+data_high_high <- generate_data(1000, 5, 5, 0.65, 0.65)
+data_low_high <- generate_data(1000, 5, 5, 0.15, 0.10)
 
-# Generate Variable3 (dummy variable with values 0 and 1)
-Variable3 <- sample(0:1, n, replace = TRUE)
+# Correlations for high-low
+cor_high_low_default <- cor(data_high_low$Min_wage, data_high_low$Adopt)
+cor_high_low_relig0 <- cor(subset(data_high_low, Relig == 0)$Min_wage, subset(data_high_low, Relig == 0)$Adopt)
+cor_high_low_relig1 <- cor(subset(data_high_low, Relig == 1)$Min_wage, subset(data_high_low, Relig == 1)$Adopt)
 
-# Generate correlated data for Variable1 and Variable2 when Variable3 is 1
-correlation_target_1 <- -0.65  # Target correlation when Variable3 is 1
-sigma_1 <- matrix(c(1, correlation_target_1, correlation_target_1, 1), nrow = 2)
-data_correlated_1 <- mvrnorm(n, mu = c(mean1, mean2), Sigma = sigma_1)
+# Correlations for low-low
+cor_low_low_default <- cor(data_low_low$Min_wage, data_low_low$Adopt)
+cor_low_low_relig0 <- cor(subset(data_low_low, Relig == 0)$Min_wage, subset(data_low_low, Relig == 0)$Adopt)
+cor_low_low_relig1 <- cor(subset(data_low_low, Relig == 1)$Min_wage, subset(data_low_low, Relig == 1)$Adopt)
 
-# Ensure values are within the range [0, 10]
-data_correlated_1 <- pmax(pmin(data_correlated_1, 10), 0)
+# Correlations for high-high
+cor_high_high_default <- cor(data_high_high$Min_wage, data_high_high$Adopt)
+cor_high_high_relig0 <- cor(subset(data_high_high, Relig == 0)$Min_wage, subset(data_high_high, Relig == 0)$Adopt)
+cor_high_high_relig1 <- cor(subset(data_high_high, Relig == 1)$Min_wage, subset(data_high_high, Relig == 1)$Adopt)
 
-# Combine the data based on Variable3
-data_high_low <- data.frame(
-  Variable1 = ifelse(Variable3 == 0, data_correlated_0[, 1], data_correlated_1[, 1]),
-  Variable2 = ifelse(Variable3 == 0, data_correlated_0[, 2], data_correlated_1[, 2]),
-  Variable3 = Variable3
-)
+# Correlations for low-high
+cor_low_high_default <- cor(data_low_high$Min_wage, data_low_high$Adopt)
+cor_low_high_relig0 <- cor(subset(data_low_high, Relig == 0)$Min_wage, subset(data_low_high, Relig == 0)$Adopt)
+cor_low_high_relig1 <- cor(subset(data_low_high, Relig == 1)$Min_wage, subset(data_low_high, Relig == 1)$Adopt)
 
-data_high_low = data_high_low %>% 
-  rename(Min_wage = Variable1, Adopt = Variable2, Relig = Variable3)
+# Create the scatter plots
+plot_high_low <- create_scatterplot(data_high_low, "High tightness, low consensus", cor_high_low_default, cor_high_low_relig0, cor_high_low_relig1)
+plot_low_low <- create_scatterplot(data_low_low, "Low tightness, low consensus", cor_low_low_default, cor_low_low_relig0, cor_low_low_relig1)
+plot_high_high <- create_scatterplot(data_high_high, "High tightness, high consensus", cor_high_high_default, cor_high_high_relig0, cor_high_high_relig1)
+plot_low_high <- create_scatterplot(data_low_high, "Low tightness, high consensus", cor_low_high_default, cor_low_high_relig0, cor_low_high_relig1)
+
+# Assemble all plots into one figure to fill a full Word page (width ~ 8.5 inches, height ~ 11 inches)
+final_plot <- (plot_high_low | plot_low_low) / (plot_high_high | plot_low_high) + 
+  plot_layout(heights = c(1, 1))
+
+# Save the assembled plot to fit a full Word page
+ggsave(here("data_vis", "tightness_consensus.jpg"), final_plot, width = 8.5, height = 11, dpi = 300)
 ```
 
-```{r}
-# Calculate correlation labels
-(correlation_value_default <- cor(data_high_low$Min_wage, data_high_low$Adopt))
-(correlation_value_relig0 <- cor(subset(data_high_low, Relig == 0)$Min_wage, 
-                                 subset(data_high_low, Relig == 0)$Adopt))
-(correlation_value_relig1 <- cor(subset(data_high_low, Relig == 1)$Min_wage, 
-                                 subset(data_high_low, Relig == 1)$Adopt))
-```
-
-```{r}
-# Create a scatterplot with modifications
-scatter_plot <- ggplot(data_high_low, aes(x = Min_wage, y = Adopt, color = factor(Relig))) +
-  geom_point(size = 0.3) +  # Reduce dot size by setting size
-  
-  # Add a regression line for the association between Min_wage and Adopt (default color)
-  geom_smooth(method = lm, se = T, color = "#5b5b5b", aes(group = 1)) +
-  
-  # Add a regression line for Min_wage and Adopt when Relig = 0 (colored with #00BFFF)
-  geom_smooth(data = subset(data_high_low, Relig == 0), method = lm, se = T, color = "#00BFFF", aes(group = 2)) +
-  
-  # Add a regression line for Min_wage and Adopt when Relig = 1 (colored with #E4717A)
-  geom_smooth(data = subset(data_high_low, Relig == 1), method = lm, se = T, color = "#E4717A", aes(group = 3)) +
-  
-  labs(x = "Support for minimum wage", y = "Support for adoption of homosex couples", 
-       title = "High tightness, low consensus") +
-  scale_color_manual(values = c("0" = "#00BFFF", "1" = "#E4717A"), labels = c("0" = "No", "1" = "Yes")) +  # Define colors and labels for Relig
-  guides(color = guide_legend(title = "Relig"))  # Add legend with the title "Relig"
-
-# Add the specified text to the top right border
-scatter_plot_with_text <- scatter_plot +
-  annotate("text", x = max(data_high_low$Min_wage), y = max(data_high_low$Adopt), 
-           label = "r = 0.00
-           r (if Relig = 0) = 0.66
-           r (if Relig = 1) = -0.66", vjust = 0.8, hjust = 1, size = 4) 
-
-# Display the scatterplot with the added text
-ggsave(here("data_vis",  "high_low.jpg"), width = 8, height = 4.5)
-
-```
-
-# Low tight low cons
-
-```{r}
-#low_low
-# Generate random values for Variable1 and Variable2
-n <- 1000  # Number of rows
-mean1 <- 5  # Mean value for Variable1
-mean2 <- 5  # Mean value for Variable2
-correlation_target <- 0.15  # Target correlation when Variable3 is 0
-
-# Generate correlated data for Variable1 and Variable2 when Variable3 is 0
-sigma <- matrix(c(1, correlation_target, correlation_target, 1), nrow = 2)
-data_correlated_0 <- mvrnorm(n, mu = c(mean1, mean2), Sigma = sigma)
-
-# Ensure values are within the range [0, 10]
-data_correlated_0 <- pmax(pmin(data_correlated_0, 10), 0)
-
-# Generate Variable3 (dummy variable with values 0 and 1)
-Variable3 <- sample(0:1, n, replace = TRUE)
-
-# Generate correlated data for Variable1 and Variable2 when Variable3 is 1
-correlation_target_1 <- -0.15  # Target correlation when Variable3 is 1
-sigma_1 <- matrix(c(1, correlation_target_1, correlation_target_1, 1), nrow = 2)
-data_correlated_1 <- mvrnorm(n, mu = c(mean1, mean2), Sigma = sigma_1)
-
-# Ensure values are within the range [0, 10]
-data_correlated_1 <- pmax(pmin(data_correlated_1, 10), 0)
-
-# Combine the data based on Variable3
-data_low_low <- data.frame(
-  Variable1 = ifelse(Variable3 == 0, data_correlated_0[, 1], data_correlated_1[, 1]),
-  Variable2 = ifelse(Variable3 == 0, data_correlated_0[, 2], data_correlated_1[, 2]),
-  Variable3 = Variable3
-)
-
-data_low_low = data_low_low %>% 
-  rename(Min_wage = Variable1, Adopt = Variable2, Relig = Variable3)
-```
-
-```{r}
-# Calculate correlation labels
-(correlation_value_default <- cor(data_low_low$Min_wage, data_low_low$Adopt))
-(correlation_value_relig0 <- cor(subset(data_low_low, Relig == 0)$Min_wage, 
-                                 subset(data_low_low, Relig == 0)$Adopt))
-(correlation_value_relig1 <- cor(subset(data_low_low, Relig == 1)$Min_wage, 
-                                 subset(data_low_low, Relig == 1)$Adopt))
-```
-
-```{r}
-# Create a scatterplot with modifications
-scatter_plot <- ggplot(data_low_low, aes(x = Min_wage, y = Adopt, color = factor(Relig))) +
-  geom_point(size = 0.3) +  # Reduce dot size by setting size
-  
-  # Add a regression line for the association between Min_wage and Adopt (default color)
-  geom_smooth(method = lm, se = F, color = "#5b5b5b", aes(group = 1)) +
-  
-  # Add a regression line for Min_wage and Adopt when Relig = 0 (colored with #00BFFF)
-  geom_smooth(data = subset(data_low_low, Relig == 0), method = lm, se = T, color = "#00BFFF", aes(group = 2)) +
-  
-  # Add a regression line for Min_wage and Adopt when Relig = 1 (colored with #E4717A)
-  geom_smooth(data = subset(data_low_low, Relig == 1), method = lm, se = T, color = "#E4717A", aes(group = 3)) +
-  
-  labs(x = "Support for minimum wage", y = "Support for adoption of homosex couples",
-       title = "Low tightness, low consensus") +
-  scale_color_manual(values = c("0" = "#00BFFF", "1" = "#E4717A"), labels = c("0" = "No", "1" = "Yes")) +  # Define colors and labels for Relig
-  guides(color = guide_legend(title = "Relig"))  # Add legend with the title "Relig"
-
-# Add the specified text to the top right border
-scatter_plot_with_text <- scatter_plot +
-  annotate("text", x = max(data_low_low$Min_wage), y = max(data_low_low$Adopt), 
-           label = "r = 0.01
-           r (if Relig = 0) = 0.13
-           r (if Relig = 1) = -0.12", vjust = 0.8, hjust = 1, size = 4) 
-
-# Display the scatterplot with the added text
-ggsave(here("data_vis",  "low_low.jpg"), width = 8, height = 4.5)
-
-```
-
-# High tight high cons
-
-```{r}
-#high_high
-
-n <- 1000  # Number of rows
-mean1 <- 5  # Mean value for Variable 1
-mean2 <- 5  # Mean value for Variable 2
-correlation_target <- 0.65  # Target correlation
-
-# Generate correlated data
-sigma <- matrix(c(1, correlation_target, correlation_target, 1), nrow = 2)
-data_correlated <- mvrnorm(n, mu = c(mean1, mean2), Sigma = sigma)
-
-# Ensure values are within the range [0, 10]
-data_correlated <- pmax(pmin(data_correlated, 10), 0)
-
-
-
-# Create a dataframe with the generated data
-data_high_high <- data.frame(Variable1 = data_correlated[, 1],
-                             Variable2 = data_correlated[, 2],
-                             Variable3 = sample(0:1, n, replace = TRUE))
-
-data_high_high = data_high_high %>% 
-  rename(Min_wage = Variable1, Adopt = Variable2, Relig = Variable3)
-
-```
-
-```{r}
-# Calculate correlation labels
-(correlation_value_default <- cor(data_high_high$Min_wage, data_high_high$Adopt))
-(correlation_value_relig0 <- cor(subset(data_high_high, Relig == 0)$Min_wage, 
-                                 subset(data_high_high, Relig == 0)$Adopt))
-(correlation_value_relig1 <- cor(subset(data_high_high, Relig == 1)$Min_wage, 
-                                 subset(data_high_high, Relig == 1)$Adopt))
-```
-
-```{r}
-# Create a scatterplot with modifications
-scatter_plot <- ggplot(data_high_high, aes(x = Min_wage, y = Adopt, color = factor(Relig))) +
-  geom_point(size = 0.3) +  # Reduce dot size by setting size
-  
-  # Add a regression line for the association between Min_wage and Adopt (default color)
-  geom_smooth(method = lm, se = T, color = "#5b5b5b", aes(group = 1)) +
-  
-  # Add a regression line for Min_wage and Adopt when Relig = 0 (colored with #00BFFF)
-  geom_smooth(data = subset(data_high_high, Relig == 0), method = lm, se = F, color = "#00BFFF", aes(group = 2)) +
-  
-  # Add a regression line for Min_wage and Adopt when Relig = 1 (colored with #E4717A)
-  geom_smooth(data = subset(data_high_high, Relig == 1), method = lm, se = F, color = "#E4717A", aes(group = 3)) +
-  
-  labs(x = "Support for minimum wage", y = "Support for adoption of homosex couples",
-       title = "High tightness, high consensus") +
-  scale_color_manual(values = c("0" = "#00BFFF", "1" = "#E4717A"), labels = c("0" = "No", "1" = "Yes")) +  # Define colors and labels for Relig
-  guides(color = guide_legend(title = "Relig"))  # Add legend with the title "Relig"
-
-# Add the specified text to the top right border
-scatter_plot_with_text <- scatter_plot +
-  annotate("text", x = max(data_high_high$Min_wage), y = max(data_high_high$Adopt), 
-           label = "r = 0.65
-           r (if Relig = 0) = 0.66
-           r (if Relig = 1) = 0.65", vjust = 0.8, hjust = 1, size = 4) 
-
-# Display the scatterplot with the added text
-ggsave(here("data_vis",  "high_high.jpg"), width = 8, height = 4.5)
-
-```
-
-# Low tight high cons
-
-```{r}
-#Low high
-# Generate random values for Variable 1 and Variable 2
-n <- 1000  # Number of rows
-mean1 <- 5  # Mean value for Variable 1
-mean2 <- 5  # Mean value for Variable 2
-correlation_target <- 0.15  # Target correlation
-
-# Generate correlated data
-sigma <- matrix(c(1, correlation_target, correlation_target, 1), nrow = 2)
-data_correlated <- mvrnorm(n, mu = c(mean1, mean2), Sigma = sigma)
-
-# Ensure values are within the range [0, 10]
-data_correlated <- pmax(pmin(data_correlated, 10), 0)
-
-Variable3 <- sample(0:1, n, replace = TRUE)
-
-# Create a dataframe with the generated data
-data_low_high <- data.frame(Variable1 = data_correlated[, 1],
-                            Variable2 = data_correlated[, 2],
-                            Variable3 = sample(0:1, n, replace = TRUE))
-
-data_low_high = data_low_high %>% 
-  rename(Min_wage = Variable1, Adopt = Variable2, Relig = Variable3)
-```
-
-```{r}
-# Calculate correlation labels
-(correlation_value_default <- cor(data_low_high$Min_wage, data_low_high$Adopt))
-(correlation_value_relig0 <- cor(subset(data_low_high, Relig == 0)$Min_wage, 
-                                 subset(data_low_high, Relig == 0)$Adopt))
-(correlation_value_relig1 <- cor(subset(data_low_high, Relig == 1)$Min_wage, 
-                                 subset(data_low_high, Relig == 1)$Adopt))
-```
-
-```{r}
-# Create a scatterplot with modifications
-scatter_plot <- ggplot(data_low_high, aes(x = Min_wage, y = Adopt, color = factor(Relig))) +
-  geom_point(size = 0.3) +  # Reduce dot size by setting size
-  
-  # Add a regression line for the association between Min_wage and Adopt (default color)
-  geom_smooth(method = lm, se = T, color = "#5b5b5b", aes(group = 1)) +
-  
-  # Add a regression line for Min_wage and Adopt when Relig = 0 (colored with #00BFFF)
-  geom_smooth(data = subset(data_low_high, Relig == 0), method = lm, se = F, color = "#00BFFF", aes(group = 2)) +
-  
-  # Add a regression line for Min_wage and Adopt when Relig = 1 (colored with #E4717A)
-  geom_smooth(data = subset(data_low_high, Relig == 1), method = lm, se = F, color = "#E4717A", aes(group = 3)) +
-  
-  labs(x = "Support for minimum wage", y = "Support for adoption of homosex couples", 
-       title = "Low tightness, high consensus") +
-  scale_color_manual(values = c("0" = "#00BFFF", "1" = "#E4717A"), labels = c("0" = "No", "1" = "Yes")) +  # Define colors and labels for Relig
-  guides(color = guide_legend(title = "Relig"))  # Add legend with the title "Relig"
-
-# Add the specified text to the top right border
-scatter_plot_with_text <- scatter_plot +
-  annotate("text", x = max(data_low_high$Min_wage), y = max(data_low_high$Adopt), 
-           label = "r = 0.13
-           r (if Relig = 0) = 0.16
-           r (if Relig = 1) = 0.10", vjust = 0.8, hjust = 1, size = 4) 
-
-# Display the scatterplot with the added text
-ggsave(here("data_vis",  "low_high.jpg"), width = 8, height = 4.5)
-
-```
 
 
 
