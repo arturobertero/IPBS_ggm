@@ -1,0 +1,2394 @@
+---
+title: "3_IPBS_mgm_230912"
+author: "Arturo Bertero"
+date: "2023-09-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(pacman)
+p_load(tidyverse, here, sjlabelled, stringr, glue, EGAnet, janitor, haven,
+       ggpubr, gridExtra, dplyr, GGally, qgraph, sjmisc, conflicted, effsize,
+       sjPlot, sna, grid, psych, stargazer, mgm, ggplot2, boot, stats,
+       ggrepel, EGAnet, NetworkToolbox, Matrix, bootnet, matrixcalc, 
+       openxlsx, devtools, jtools, corrr, patchwork, magick, hrbrthemes) 
+
+options(scipen=999)
+
+#conflicts
+conflicts_prefer(dplyr::select)
+conflicts_prefer(dplyr::filter)
+conflicts_prefer(sna::degree)
+conflicts_prefer(sna::closeness)
+conflicts_prefer(sna::betweenness)
+
+```
+
+# Input
+
+```{r}
+#Load data
+IPBS = readRDS((here("Input", "IPBS.rds")))
+
+#Filter smaller dataset
+att = IPBS %>% 
+  dplyr::select(c(L_R:ukrai)) 
+
+#Partitions
+load(file = here("Input", "Partitions", "pol_int_partitions.RData"))
+load(file = here("Input", "Partitions", "pol_int_partitions_2_1.RData"))
+load(file = here("Input", "Partitions", "pol_int_partitions_2_2.RData"))
+load(file = here("Input", "Partitions", "educ_partitions.RData"))
+load(file = here("Input", "Partitions", "vote_partitions.RData"))
+
+#Fast running (run [0] or skip [1] bootnet and NCT)
+fast_running = 1
+```
+
+# Processing
+
+##  Cor network estimation 
+
+```{r}
+# Define shortnames, longnames, and groupings as per your original code
+shortnames <- names(att)
+longnames <- c("Left right","Propensity to vote for PD",
+               "Propensity to vote for FI","Propensity to vote for L",
+               "Propensity to vote for M5S","Propensity to vote for FDI",
+               "Step child adoption","Abortion","Euthanasia","Omosexual marriage",
+               "Redistribution","Flat tax","Minimum wage","Citizenship income",
+               "Globalization","Immigration","Big government",
+               "Public vs private","Weapons to Ukraine")
+
+Totalgroup_comm <- list(
+  "Symbolic" = c(1:6),
+  "Operational" = c(7:19)
+)
+
+Totalgroup_cols <- c("#966FD6B3","#008B8BB3")  
+```
+
+```{r}
+# estimation on att
+
+#remove labels
+att = sapply(att, haven::zap_labels)
+
+#declare operational or symbolic
+nature = c(rep("Symbolic", 6),
+            rep("Operational", 13))
+
+#Fit cor network 
+att_net = cor_auto(att, npn.SKEPTIC = T, #Nonparanormal transformation (HUGE)
+                        ordinalLevelMax = 7, #from keskinturk
+                        forcePD = TRUE,
+                        missing = "pairwise",
+                        verbose = FALSE)
+
+#square the matrix
+att_net = abs(att_net)
+
+#plot
+qgraph(att_net,
+         fade = TRUE, layout = "spring", theme = "colorblind",  
+         labels = shortnames, nodeNames = longnames,
+         vsize = 7.0, label.cex = 1.1, esize = 15, vTrans = 255,
+         groups = Totalgroup_comm, color = Totalgroup_cols,
+         legend = F, legend.cex = 0.40, title = "Correlational network",
+         filetype = "jpg", filename = here("Output", "Supplement", "att"))
+```
+
+```{r}
+# Function to ensure input data is in matrix/data frame format
+prepare_data <- function(data) {
+  if (is.list(data)) {
+    return(as.data.frame(do.call(cbind, data)))  # Convert list to data frame
+  } else if (is.vector(data)) {
+    return(as.data.frame(matrix(data, nrow = length(data))))  # Convert vector to a data frame
+  } else {
+    return(as.data.frame(data))  # Already in correct format
+  }
+}
+
+# Function to fit and plot correlation networks and save the plots to a file
+generate_network_plots <- function(low_data, high_data, shortnames, longnames, group_names, group_colors, title_low, title_high, file_base) {
+  # Remove labels
+  low_data <- sapply(low_data, haven::zap_labels)
+  high_data <- sapply(high_data, haven::zap_labels)
+  
+  # Fit GGM for low data
+  low_data_net <- cor_auto(low_data, npn.SKEPTIC = TRUE, ordinalLevelMax = 7, forcePD = TRUE, missing = "pairwise", verbose = FALSE)
+  low_data_net <- abs(low_data_net)  # Square the matrix
+  
+  # Fit GGM for high data
+  high_data_net <- cor_auto(high_data, npn.SKEPTIC = TRUE, ordinalLevelMax = 7, forcePD = TRUE, missing = "pairwise", verbose = FALSE)
+  high_data_net <- abs(high_data_net)  # Square the matrix
+  
+  # Save plot for low data
+  set.seed(1)
+  qgraph(low_data_net,
+         fade = TRUE, layout = "spring", theme = "colorblind",  
+         labels = shortnames, nodeNames = longnames,
+         vsize = 7.0, label.cex = 1.1, esize = 15, vTrans = 255,
+         groups = group_names, color = group_colors,
+         legend = F, legend.cex = 0.40, title = title_low,
+         filetype = "jpg", filename = here("Output", "Supplement", paste0(file_base, "_Low")))
+  
+  # Save plot for high data
+  set.seed(1)
+  qgraph(high_data_net,
+         fade = TRUE, layout = "spring", theme = "colorblind",  
+         labels = shortnames, nodeNames = longnames,
+         vsize = 7.0, label.cex = 1.1, esize = 15, vTrans = 255,
+         groups = group_names, color = group_colors,
+         legend = F, legend.cex = 0.40, title = title_high,
+         filetype = "jpg", filename = here("Output", "Supplement", paste0(file_base, "_High")))
+}
+
+# Generate Political Interest plots and save them
+generate_network_plots(
+  low_data = prepare_data(polint_2_1_l),
+  high_data = prepare_data(polint_2_1_h),
+  shortnames = shortnames, 
+  longnames = longnames,
+  group_names = Totalgroup_comm, 
+  group_colors = Totalgroup_cols, 
+  title_low = "Political Interest - Low",
+  title_high = "Political Interest - High",
+  file_base = "Fig_Political_Interest"
+)
+
+# Generate Education plots and save them
+generate_network_plots(
+  low_data = prepare_data(educ_low),
+  high_data = prepare_data(educ_high),
+  shortnames = shortnames, 
+  longnames = longnames,
+  group_names = Totalgroup_comm, 
+  group_colors = Totalgroup_cols, 
+  title_low = "Education - Low",
+  title_high = "Education - High",
+  file_base = "Fig_Education"
+)
+
+```
+
+
+## MGMs
+
+```{r}
+# mgm on att
+  mgm_att <- mgm(att, type = rep("g", length(shortnames)), 
+                   level = rep(1, length(shortnames)), lambdaSel = "EBIC", ruleReg = "OR")
+  
+  # Predictability
+  pred_att <- predict(object = mgm_att, data = att, errorCon = 'R2')
+  
+  # Plot the MGM network
+  graph_mgm <- qgraph(mgm_att$pairwise$wadj, layout = 'spring',
+                      labels = shortnames, nodeNames = longnames,  
+                      groups = Totalgroup_comm, color = Totalgroup_cols, 
+                      legend = F, legend.cex = 0.33, title = "mgm",
+                      edge.color = mgm_att$pairwise$edgecolor_cb, vTrans = 255,
+                      borders = T, vsize = 7.0, esize = 15, GLratio = 2,
+                      pie = pred_att$errors[,2], pieColor = rep('#FFFF00', length(shortnames)),
+                      filetype = "jpg",  
+                      filename = here("Output", "Supplement", "att_mgm"))
+
+```
+
+
+```{r}
+# Function to ensure input data is in matrix format
+prepare_matrix_data <- function(data) {
+  if (!is.matrix(data)) {
+    return(as.matrix(data))  # Convert to matrix if it's not already
+  }
+  return(data)
+}
+
+# Function to fit MGM and plot the results
+fit_and_plot_mgm <- function(data, shortnames, longnames, mgm_groups, mgm_colors, file_base) {
+  # Prepare data as a matrix
+  data_matrix <- prepare_matrix_data(data)
+  
+  # Fit MGM model (all continuous variables)
+  mgm_model <- mgm(data_matrix, type = rep("g", length(shortnames)), 
+                   level = rep(1, length(shortnames)), lambdaSel = "EBIC", ruleReg = "OR")
+  
+  # Predictability
+  pred_mgm <- predict(object = mgm_model, data = data_matrix, errorCon = 'R2')
+  
+  # Plot the MGM network
+  graph_mgm <- qgraph(mgm_model$pairwise$wadj, layout = 'spring',
+                      labels = shortnames, nodeNames = longnames,  
+                      groups = mgm_groups, color = mgm_colors, 
+                      legend = F, legend.cex = 0.33, vTrans = 255,
+                      edge.color = mgm_model$pairwise$edgecolor_cb,
+                      borders = T, vsize = 7.0, esize = 15, GLratio = 2,
+                      pie = pred_mgm$errors[,2], pieColor = rep('#FFFF00', length(shortnames)),
+                      filetype = "jpg",  
+                      filename = here("Output", "Supplement", file_base))
+}
+
+# Fit and plot MGM for all datasets
+datasets <- list(
+  "pol_int_low" = polint_2_1_l,
+  "pol_int_high" = polint_2_1_h,
+  "educ_low" = educ_low,
+  "educ_high" = educ_high
+)
+
+# Loop through datasets and apply MGM fitting and plotting
+for (name in names(datasets)) {
+  fit_and_plot_mgm(
+    data = datasets[[name]],
+    shortnames = shortnames, 
+    longnames = longnames,
+    mgm_groups = Totalgroup_comm, 
+    mgm_colors = Totalgroup_cols, 
+    file_base = paste0(name, "_mgm")
+  )
+}
+
+
+```
+
+
+## Bootstrap analyses (cor)
+
+```{r}
+if (fast_running==0) {
+
+##############################
+#Bootstrapped on full samples
+##############################
+
+#boots_att
+boot_att = zap_labels(att) %>%
+          data.frame()
+
+df.boot_att = bootnet(boot_att, nBoots = 10000, nCores = 8,
+                     default = "cor", type = "nonparametric",
+                     corMethod = "cor_auto", corArgs = list(
+                        npn.SKEPTIC = T,
+                        ordinalLevelMax = 7, 
+                        forcePD = TRUE,
+                        missing = "pairwise",
+                        verbose = FALSE),
+                        computeCentrality = FALSE)
+#Save Bootnets
+save(df.boot_att, file = here("Input", "Boots", "boots_att.RData"))
+
+###############
+#Bootstrap pint
+###############
+
+#low
+polint_low_and_midlow = zap_labels(polint_low_and_midlow) %>%
+          data.frame()
+df.boot_pint_l <- bootnet(polint_low_and_midlow, nBoots = 10000, nCores = 8,
+                     default = "cor", type = "nonparametric",
+                     corMethod = "cor_auto", corArgs = list(
+                        npn.SKEPTIC = T,
+                        ordinalLevelMax = 7, 
+                        forcePD = TRUE,
+                        missing = "pairwise",
+                        verbose = FALSE),
+                        computeCentrality = FALSE)
+
+#mid
+pol_int_midhigh = zap_labels(pol_int_midhigh) %>%
+          data.frame()
+df.boot_pint_m <- bootnet(pol_int_midhigh, nBoots = 10000, nCores = 8,
+                     default = "cor", type = "nonparametric",
+                     corMethod = "cor_auto", corArgs = list(
+                        npn.SKEPTIC = T,
+                        ordinalLevelMax = 7, 
+                        forcePD = TRUE,
+                        missing = "pairwise",
+                        verbose = FALSE),
+                        computeCentrality = FALSE)
+
+#high
+pol_int_high = zap_labels(pol_int_high) %>%
+          data.frame()
+df.boot_pint_h <- bootnet(pol_int_high, nBoots = 10000, nCores = 8,
+                     default = "cor", type = "nonparametric",
+                     corMethod = "cor_auto", corArgs = list(
+                        npn.SKEPTIC = T,
+                        ordinalLevelMax = 7, 
+                        forcePD = TRUE,
+                        missing = "pairwise",
+                        verbose = FALSE),
+                        computeCentrality = FALSE)
+
+#Save Bootnets
+save(df.boot_pint_l,df.boot_pint_m,df.boot_pint_h,
+     file = here("Input", "Boots", "boots_pint.RData"))
+
+###############
+#Bootstrap educ
+###############
+
+#low
+educ_low = zap_labels(educ_low) %>%
+          data.frame()
+df.boot_educ_l <- bootnet(educ_low, nBoots = 10000, nCores = 8,
+                     default = "cor", type = "nonparametric",
+                     corMethod = "cor_auto", corArgs = list(
+                        npn.SKEPTIC = T,
+                        ordinalLevelMax = 7, 
+                        forcePD = TRUE,
+                        missing = "pairwise",
+                        verbose = FALSE),
+                        computeCentrality = FALSE)
+
+#high
+educ_high = zap_labels(educ_high) %>%
+          data.frame()
+df.boot_educ_h <- bootnet(educ_high, nBoots = 10000, nCores = 8,
+                     default = "cor", type = "nonparametric",
+                     corMethod = "cor_auto", corArgs = list(
+                        npn.SKEPTIC = T,
+                        ordinalLevelMax = 7, 
+                        forcePD = TRUE,
+                        missing = "pairwise",
+                        verbose = FALSE),
+                        computeCentrality = FALSE)
+
+#Save Bootnets
+save(df.boot_educ_l,df.boot_educ_h,
+     file = here("Input", "Boots", "boots_educ.RData"))
+
+#################
+#Additional pint#
+#################
+
+# On 2_1
+
+#low
+polint_l_2_1 = zap_labels(polint_2_1_l) %>%
+          data.frame()
+df.boot_pint_l_2_1 <- bootnet(polint_l_2_1, nBoots = 10000, nCores = 8,
+                     default = "cor", type = "nonparametric",
+                     corMethod = "cor_auto", corArgs = list(
+                        npn.SKEPTIC = T,
+                        ordinalLevelMax = 7, 
+                        forcePD = TRUE,
+                        missing = "pairwise",
+                        verbose = FALSE),
+                        computeCentrality = FALSE)
+
+#high
+polint_h_2_1 = zap_labels(polint_2_1_h) %>%
+          data.frame()
+df.boot_pint_h_2_1 <- bootnet(polint_h_2_1, nBoots = 10000, nCores = 8,
+                     default = "cor", type = "nonparametric",
+                     corMethod = "cor_auto", corArgs = list(
+                        npn.SKEPTIC = T,
+                        ordinalLevelMax = 7, 
+                        forcePD = TRUE,
+                        missing = "pairwise",
+                        verbose = FALSE),
+                        computeCentrality = FALSE)
+
+#Save Bootnets
+save(df.boot_pint_l_2_1,df.boot_pint_h_2_1,
+     file = here("Input", "Boots", "boots_pint_2_1.RData"))
+
+# On 2_2
+
+#low
+polint_l_2_2 = zap_labels(polint_2_2_l) %>%
+          data.frame()
+df.boot_pint_l_2_2 <- bootnet(polint_l_2_2, nBoots = 10000, nCores = 8,
+                     default = "cor", type = "nonparametric",
+                     corMethod = "cor_auto", corArgs = list(
+                        npn.SKEPTIC = T,
+                        ordinalLevelMax = 7, 
+                        forcePD = TRUE,
+                        missing = "pairwise",
+                        verbose = FALSE),
+                        computeCentrality = FALSE)
+
+#high
+polint_h_2_2 = zap_labels(polint_2_2_h) %>%
+          data.frame()
+df.boot_pint_h_2_2 <- bootnet(polint_h_2_2, nBoots = 10000, nCores = 8,
+                     default = "cor", type = "nonparametric",
+                     corMethod = "cor_auto", corArgs = list(
+                        npn.SKEPTIC = T,
+                        ordinalLevelMax = 7, 
+                        forcePD = TRUE,
+                        missing = "pairwise",
+                        verbose = FALSE),
+                        computeCentrality = FALSE)
+
+#Save Bootnets
+save(df.boot_pint_l_2_2,df.boot_pint_h_2_2,
+     file = here("Input", "Boots", "boots_pint_2_2.RData"))
+
+} else {
+  
+  #Boots
+load(file = here("Input", "Boots", "boots_att.RData"))
+load(file = here("Input", "Boots", "boots_pint.RData"))
+load(file = here("Input", "Boots", "boots_educ.RData"))
+load(file = here("Input", "Boots", "boots_pint_2_1.RData"))
+load(file = here("Input", "Boots", "boots_pint_2_2.RData"))
+}
+```
+
+## Bootstrap analyses (pcor)
+
+```{r}
+if (fast_running==0) {
+
+##############################
+#Bootstrapped on full samples
+##############################
+
+#boots_att_pc
+df.boot_att_pc <- bootnet(boot_att, nBoots = 10000, nCores = 8,
+                     default = "EBICglasso", statistics = c("edge"),
+                        computeCentrality = FALSE)
+#Save Bootnets
+save(df.boot_att_pc, file = here("Input", "Boots", "boots_att_pc.RData"))
+
+
+###############
+#Bootstrap pint
+###############
+
+#boots_pint_l_pc
+df.boot_pint_l_pc <- bootnet(polint_low_and_midlow, nBoots = 10000, nCores = 8,
+                     default = "EBICglasso", statistics = c("edge"),
+                        computeCentrality = FALSE)
+
+#boots_pint_m_pc
+df.boot_pint_m_pc <- bootnet(pol_int_midhigh, nBoots = 10000, nCores = 8,
+                     default = "EBICglasso", statistics = c("edge"),
+                        computeCentrality = FALSE)
+
+#boots_pint_h_pc
+df.boot_pint_h_pc <- bootnet(pol_int_high, nBoots = 10000, nCores = 8,
+                     default = "EBICglasso", statistics = c("edge"),
+                        computeCentrality = FALSE)
+#Save Bootnets 
+save(df.boot_pint_l_pc,df.boot_pint_m_pc,df.boot_pint_h_pc,
+     file = here("Input", "Boots", "boots_pint_pc.RData"))
+
+
+###############
+#Bootstrap educ
+###############
+
+#boots_educ_l_pc
+df.boot_educ_l_pc <- bootnet(educ_low, nBoots = 10000, nCores = 8,
+                     default = "EBICglasso", statistics = c("edge"),
+                        computeCentrality = FALSE)
+
+#boots_educ_h_pc
+df.boot_educ_h_pc <- bootnet(educ_high, nBoots = 10000, nCores = 8,
+                     default = "EBICglasso", statistics = c("edge"),
+                        computeCentrality = FALSE)
+
+#Save Bootnets
+save(df.boot_educ_l_pc,df.boot_educ_h_pc,
+     file = here("Input", "Boots", "boots_educ_pc.RData"))
+
+
+
+#################
+#Additional pint#
+#################
+
+# On 2_1
+
+#low
+df.boot_pint_l_2_1_pc <- bootnet(polint_l_2_1, nBoots = 10000, nCores = 8,
+                     default = "EBICglasso", statistics = c("edge"),
+                        computeCentrality = FALSE)
+
+#high
+df.boot_pint_h_2_1_pc <- bootnet(polint_h_2_1, nBoots = 10000, nCores = 8,
+                     default = "EBICglasso", statistics = c("edge"),
+                        computeCentrality = FALSE)
+
+#Save Bootnets
+save(df.boot_pint_l_2_1_pc,df.boot_pint_h_2_1_pc,
+     file = here("Input", "Boots", "boots_pint_2_1_pc.RData"))
+
+# On 2_2
+
+#low
+df.boot_pint_l_2_2_pc <- bootnet(polint_l_2_2, nBoots = 10000, nCores = 8,
+                     default = "EBICglasso", statistics = c("edge"),
+                        computeCentrality = FALSE)
+
+#high
+df.boot_pint_h_2_2_pc <- bootnet(polint_h_2_2, nBoots = 10000, nCores = 8,
+                     default = "EBICglasso", statistics = c("edge"),
+                        computeCentrality = FALSE)
+
+#Save Bootnets
+save(df.boot_pint_l_2_2_pc,df.boot_pint_h_2_2_pc,
+     file = here("Input", "Boots", "boots_pint_2_2_pc.RData"))
+
+} else {
+  
+  #Boots
+load(file = here("Input", "Boots", "boots_att_pc.RData"))
+load(file = here("Input", "Boots", "boots_pint_pc.RData"))
+load(file = here("Input", "Boots", "boots_educ_pc.RData"))
+load(file = here("Input", "Boots", "boots_pint_2_1_pc.RData"))
+load(file = here("Input", "Boots", "boots_pint_2_2_pc.RData"))
+}
+```
+
+## Extract info from boots
+
+```{r}
+# function for cor objects
+process_boots_data <- function(df_boot) {
+  # Extract the matrices
+  matrix_list <- lapply(1:10000, function(i) {
+    df_boot[["boots"]][[i]][["graph"]]
+  })
+  
+  # Calculate the mean of non-zero values in the absolute value matrix for each matrix
+  mean_values <- sapply(matrix_list, function(mat) {
+    abs_matrix <- abs(mat)
+    # Extract non-zero values and calculate the mean
+    non_zero_values <- abs_matrix[abs_matrix != 0]
+    mean(non_zero_values)
+  })
+  
+  return(mean_values)
+}
+
+# Function to process boot of mgm objects with absolute values
+process_boots_data_pc <- function(df_boot) {
+  # Extract the matrices
+  matrix_list <- lapply(1:10000, function(i) {
+    df_boot[["boots"]][[i]][["graph"]]
+  })
+  
+  # Calculate the mean of non-zero values in the absolute value of each matrix
+  mean_values <- sapply(matrix_list, function(mat) {
+    abs_matrix <- abs(mat)
+    # Extract non-zero values and calculate the mean
+    non_zero_values <- abs_matrix[abs_matrix != 0]
+    mean(non_zero_values)
+  })
+  
+  return(mean_values)
+}
+
+#######
+##cor##
+#######
+
+# Apply the function to pint dataset
+cons_pint_l <- process_boots_data(df.boot_pint_l)
+cons_pint_m <- process_boots_data(df.boot_pint_m)
+cons_pint_h <- process_boots_data(df.boot_pint_h)
+
+# Apply the function to pint 2_1 dataset
+cons_pint_l_2_1 <- process_boots_data(df.boot_pint_l_2_1)
+cons_pint_h_2_1 <- process_boots_data(df.boot_pint_h_2_1)
+
+# Apply the function to pint 2_2 dataset
+cons_pint_l_2_2 <- process_boots_data(df.boot_pint_l_2_2)
+cons_pint_h_2_2 <- process_boots_data(df.boot_pint_h_2_2)
+
+# Apply the function to educ dataset
+cons_educ_l <- process_boots_data(df.boot_educ_l)
+cons_educ_h <- process_boots_data(df.boot_educ_h)
+
+########
+##pcor##
+########
+
+# Apply the function to pint dataset
+cons_pint_l_pc <- process_boots_data_pc(df.boot_pint_l_pc)
+cons_pint_m_pc <- process_boots_data_pc(df.boot_pint_m_pc)
+cons_pint_h_pc <- process_boots_data_pc(df.boot_pint_h_pc)
+
+# Apply the function to pint 2_1 dataset
+cons_pint_l_2_1_pc <- process_boots_data_pc(df.boot_pint_l_2_1_pc)
+cons_pint_h_2_1_pc <- process_boots_data_pc(df.boot_pint_h_2_1_pc)  
+
+# Apply the function to pint 2_2 dataset
+cons_pint_l_2_2_pc <- process_boots_data_pc(df.boot_pint_l_2_2_pc)
+cons_pint_h_2_2_pc <- process_boots_data_pc(df.boot_pint_h_2_2_pc)  
+
+# Apply the function to educ dataset
+cons_educ_l_pc <- process_boots_data_pc(df.boot_educ_l_pc)
+cons_educ_h_pc <- process_boots_data_pc(df.boot_educ_h_pc)
+```
+
+
+## H1 and H2 
+
+### Multiplot networks att
+
+```{r}
+# Figure_1 (cor vs mgm)
+img1 <- image_read(here("Output", "Supplement", "att.jpg"))
+img2 <- image_read(here("Output", "Supplement", "att_mgm.jpg"))
+combined_img <- image_append(c(img1, img2), stack = FALSE)
+image_write(combined_img, path = here("Output", "Article", "Figure_1.jpg"))
+
+```
+
+### Constraint
+
+#### Mann-Whitney U Test (constraint)
+
+```{r}
+# Create function to fit the test
+run_mann_whitney <- function(group_low, group_high, label) {
+  test_result <- wilcox.test(group_low, group_high, exact = FALSE)
+  
+  # Print results
+  cat("\n----------------------------------\n")
+  cat("Mann-Whitney U Test for:", label, "\n")
+  cat("----------------------------------\n")
+  cat("W statistic:", test_result$statistic, "\n")
+  cat("p-value:", test_result$p.value, "\n")
+  cat("----------------------------------\n")
+  
+  return(test_result)
+}
+
+# 1. Correlational networks
+mw_pint_2_1 <- run_mann_whitney(cons_pint_l_2_1, cons_pint_h_2_1, "Cor: Political Interest (2_1)")
+mw_pint_2_2 <- run_mann_whitney(cons_pint_l_2_2, cons_pint_h_2_2, "Cor: Political Interest (2_2)")
+mw_educ <- run_mann_whitney(cons_educ_l, cons_educ_h, "Cor: Education")
+
+# 2. Partial correlation networks 
+mw_pint_2_1_pc <- run_mann_whitney(cons_pint_l_2_1_pc, cons_pint_h_2_1_pc, "PCor: Political Interest (2_1)")
+mw_pint_2_2_pc <- run_mann_whitney(cons_pint_l_2_2_pc, cons_pint_h_2_2_pc, "PCor: Political Interest (2_2)")
+mw_educ_pc <- run_mann_whitney(cons_educ_l_pc, cons_educ_h_pc, "PCor: Education")
+```
+
+```{r}
+# Function for eff sizes (Cliff’s Delta)
+compute_cliffs_delta <- function(group_low, group_high, label) {
+  delta <- cliff.delta(group_low, group_high)
+  
+  # Print results
+  cat("\n----------------------------------\n")
+  cat("Cliff’s Delta for:", label, "\n")
+  cat("----------------------------------\n")
+  cat("Delta:", delta$estimate, "\n")
+  cat("95% CI:", delta$conf.int[1], "to", delta$conf.int[2], "\n")
+  cat("----------------------------------\n")
+  
+  return(delta)
+}
+
+# 1. Correlational networks
+cd_pint_2_1 <- compute_cliffs_delta(cons_pint_l_2_1, cons_pint_h_2_1, "Cor: Political Interest (2_1)")
+cd_pint_2_2 <- compute_cliffs_delta(cons_pint_l_2_2, cons_pint_h_2_2, "Cor: Political Interest (2_2)")
+cd_educ <- compute_cliffs_delta(cons_educ_l, cons_educ_h, "Cor: Education")
+
+# 2. Partial correlation networks 
+cd_pint_2_1_pc <- compute_cliffs_delta(cons_pint_l_2_1_pc, cons_pint_h_2_1_pc, "PCor: Political Interest (2_1)")
+cd_pint_2_2_pc <- compute_cliffs_delta(cons_pint_l_2_2_pc, cons_pint_h_2_2_pc, "PCor: Political Interest (2_2)")
+cd_educ_pc <- compute_cliffs_delta(cons_educ_l_pc, cons_educ_h_pc, "PCor: Education")
+```
+
+```{r}
+# Violins for Mann results
+
+# Define custom colors for low vs. high partitions
+custom_colors <- c("Low" = "#966FD6B3", "High" = "#008B8BB3")
+
+# Define function to create violins with tighter spacing
+create_violin_plot <- function(data, subtitle) {
+  data$Group <- factor(data$Group, levels = c("Low", "High"))  
+  
+  ggplot(data, aes(x = Group, y = MeanConstraint, fill = Group)) +
+    geom_violin(trim = TRUE, scale = "count", width = 0.8, alpha = 0.8) +  
+    geom_boxplot(width = 0.1, outlier.shape = NA, color = "black") +
+    labs(subtitle = subtitle, x = "", y = "Mean Constraint") +
+    scale_fill_manual(values = custom_colors) +
+    theme_minimal(base_size = 14) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.title.y = element_text(size = 14),
+      plot.subtitle = element_text(size = 14, face = "italic", hjust = 0.5),
+      plot.margin = margin(10, 10, 10, 10),  # Ensure space for titles
+      panel.spacing = unit(0.5, "lines"),
+      legend.position = "none"
+    )
+}
+
+# Prepare data for plotting
+df_pint_cor <- data.frame(
+  MeanConstraint = c(cons_pint_l_2_2, cons_pint_h_2_2),
+  Group = rep(c("Low", "High"), each = length(cons_pint_l_2_2))
+)
+
+df_pint_pc <- data.frame(
+  MeanConstraint = c(cons_pint_l_2_2_pc, cons_pint_h_2_2_pc),
+  Group = rep(c("Low", "High"), each = length(cons_pint_l_2_2_pc))
+)
+
+df_educ_cor <- data.frame(
+  MeanConstraint = c(cons_educ_l, cons_educ_h),
+  Group = rep(c("Low", "High"), each = length(cons_educ_l))
+)
+
+df_educ_pc <- data.frame(
+  MeanConstraint = c(cons_educ_l_pc, cons_educ_h_pc),
+  Group = rep(c("Low", "High"), each = length(cons_educ_l_pc))
+)
+
+# Create plots for Political Interest
+p1 <- create_violin_plot(df_pint_cor, "Correlational network")
+p2 <- create_violin_plot(df_pint_pc, "mgm")
+
+# Create plots for Education
+p3 <- create_violin_plot(df_educ_cor, "Correlational network")
+p4 <- create_violin_plot(df_educ_pc, "mgm")
+
+# Add Political Interest title
+H1_title <- ggplot() + 
+  annotate("text", x = 1, y = 1, label = "Political Interest", size = 10, fontface = "bold") +
+  theme_void() +
+  theme(plot.margin = margin(15, 0, 5, 0))  # Add extra top margin to prevent cropping
+
+# Add Education title
+H2_title <- ggplot() + 
+  annotate("text", x = 1, y = 1, label = "Education", size = 10, fontface = "bold") +
+  theme_void() +
+  theme(plot.margin = margin(15, 0, 5, 0))  # Add extra top margin
+
+# Arrange plots with titles, ensuring maximum space use
+final_plot <- (
+  H1_title / (p1 | p2) /  # Political Interest row
+  H2_title / (p3 | p4)    # Education row
+) + 
+  plot_layout(heights = c(0.1, 1, 0.1, 1))  # Increase title row heights
+
+# Save with optimized size
+ggsave(here("Output", "Article", "CONSTRAINT_MANN.jpg"), 
+       plot = final_plot, width = 12, height = 12, dpi = 300, bg = "white")
+```
+
+
+#### Violins (bootstrapped CIs)
+
+```{r}
+# Function to create and print plots with custom colors for Correlational network and mgm
+create_plot <- function(df_l, df_m = NULL, df_h, df_l_pc, df_m_pc = NULL, df_h_pc, x_axis_label) {
+  # Create vectors for pint (if applicable) or education
+  if (!is.null(df_m)) {
+    pint <- c(rep("Low", 10000), rep("Medium", 10000), rep("High", 10000))
+    pint <- factor(pint, levels = c("Low", "Medium", "High"))
+    
+    # Combine the cons_pint and cons_pint_pc data into one data frame
+    const_val <- c(df_l, df_m, df_h, df_l_pc, df_m_pc, df_h_pc)
+    data_type <- rep(c("Correlational network", "mgm"), each = 30000)
+    pint_vector <- rep(pint, 2)  # Repeat pint vector twice for Correlational network and mgm
+
+  } else {
+    pint <- c(rep("Low", 10000), rep("High", 10000))
+    pint <- factor(pint, levels = c("Low", "High"))
+    
+    # Combine the cons_pint and cons_pint_pc data into one data frame (only low and high)
+    const_val <- c(df_l, df_h, df_l_pc, df_h_pc)
+    data_type <- rep(c("Correlational network", "mgm"), each = 20000)
+    pint_vector <- rep(pint, 2)  # Repeat pint vector twice for Correlational network and mgm
+  }
+
+  mcon_data <- data.frame(
+    const_val = const_val,
+    pint = pint_vector,
+    data_type = data_type
+  )
+
+  # Calculate quantile-based confidence intervals (90% CI)
+  mcon_data_summary <- mcon_data %>%
+    group_by(pint, data_type) %>%
+    summarise(
+      m = mean(const_val),
+      ymin = quantile(const_val, 0.025),  # 2.5 percentile
+      ymax = quantile(const_val, 0.975)   # 97.5 percentile
+    )
+
+# Create the faceted plot with different y-axis scales and custom colors
+plot <- ggplot() +
+  geom_violin(data = mcon_data, aes(x = pint, y = const_val, fill = data_type), 
+              scale = "count", width = 0.6) +  # Map fill to data_type
+  geom_errorbar(data = mcon_data_summary, aes(x = pint, ymin = ymin, ymax = ymax), 
+                width = 0.2, linewidth = 0.7, color = "black") +
+  theme_ipsum() +
+  ylab("Mean Constraint") +
+  xlab(x_axis_label) +  # Set the dynamic x-axis label here
+  facet_wrap(~data_type, scales = "free_y") +  # Allow different y-axis scales
+  scale_fill_manual(values = c("Correlational network" = "#966FD6B3", "mgm" = "#008B8BB3")) +  # Custom colors
+  theme(
+    axis.title.x = element_text(), 
+    legend.position = "none",
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5)  # Increase font size, center the title
+  )
+
+# Print the plot
+print(plot)
+}
+
+# Create and print the H1_pint plot (with three levels)
+H1 = create_plot(cons_pint_l, cons_pint_m, cons_pint_h, cons_pint_l_pc, cons_pint_m_pc, cons_pint_h_pc, "Political Interest") +
+  ggtitle("Political Interest") + 
+  theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
+
+# Create and print the H1_pint_2_1 plot (with two levels)
+H1_2_1 = create_plot(cons_pint_l_2_1, NULL, cons_pint_h_2_1, cons_pint_l_2_1_pc, NULL, cons_pint_h_2_1_pc, "Political Interest - Option 2") +
+  ggtitle("Political Interest - Option 2") + 
+  theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
+
+# Create and print the H1_pint_2_2 plot (with two levels)
+H1_2_2 = create_plot(cons_pint_l_2_2, NULL, cons_pint_h_2_2, cons_pint_l_2_2_pc, NULL, cons_pint_h_2_2_pc, "Political Interest") +
+  ggtitle("Political Interest") + 
+  theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
+
+# Create and print the H2_educ plot (with two levels and x-axis label "Education")
+H2 = create_plot(cons_educ_l, NULL, cons_educ_h, cons_educ_l_pc, NULL, cons_educ_h_pc, "Education") +
+  ggtitle("Education") + 
+  theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
+
+```
+
+```{r}
+# Figure_2 multiplot
+Figure_2 = H1_2_2 / H2
+
+ggsave(here("Output", "Article", "Figure_2.jpg"), Figure_2, width = 12, height = 8, dpi = 300)
+
+# Fig_3 multiplot
+Fig_3 = H1 / H1_2_1
+
+ggsave(here("Output", "Supplement", "Fig_3.jpg"), Fig_3, width = 12, height = 8, dpi = 300)
+```
+
+### R2
+
+#### Mann-Whitney U Test (R2)
+
+```{r}
+# Load R2 bootstrapped values
+load(file = here("Input", "Boots", "R2_boot_results.RData"))
+
+# Create an empty list to store the 19 node-wise matrices
+r2_mat <- vector("list", length(shortnames))
+names(r2_mat) <- shortnames  # Assign node names to the list
+
+# Loop over each node (column in r2_results matrices)
+for (i in seq_along(shortnames)) {
+  node_name <- shortnames[i]  # Get the current node name
+  
+  # Extract R² values for this node across all bootstrap iterations and all conditions
+  node_r2_matrix <- cbind(
+    polint_2_2_l = r2_results$polint_2_2_l[, i],  
+    polint_2_2_h = r2_results$polint_2_2_h[, i],  
+    educ_low     = r2_results$educ_low[, i],      
+    educ_high    = r2_results$educ_high[, i]     
+  )
+  
+  # Store the matrix in the list
+  r2_mat[[node_name]] <- node_r2_matrix
+}
+
+```
+
+```{r}
+# Function to perform Mann-Whitney U test node-wise
+run_mann_whitney <- function(group_1, group_2, node_name, label) {
+  test_result <- wilcox.test(group_1, group_2, exact = FALSE)
+  
+  # Print results
+  cat("\n----------------------------------\n")
+  cat("Mann-Whitney U Test for:", label, "-", node_name, "\n")
+  cat("----------------------------------\n")
+  cat("W statistic:", test_result$statistic, "\n")
+  cat("p-value:", test_result$p.value, "\n")
+  cat("----------------------------------\n")
+  
+  return(test_result)
+}
+
+# Initialize lists to store test results
+mw_results_pint <- list()
+mw_results_educ <- list()
+
+# Perform Mann-Whitney U tests node-wise
+for (node in names(r2_mat)) {
+  
+  # Extract data for this node (1000 rows × 4 columns)
+  node_data <- r2_mat[[node]]
+  
+  # Compare Political Interest (polint_2_2_l vs. polint_2_2_h)
+  mw_results_pint[[node]] <- run_mann_whitney(node_data[, 1], node_data[, 2], node, "Political Interest")
+  
+  # Compare Education (educ_low vs. educ_high)
+  mw_results_educ[[node]] <- run_mann_whitney(node_data[, 3], node_data[, 4], node, "Education")
+}
+
+```
+
+```{r}
+# Initialize lists to store Cliff’s Delta results
+cliffs_delta_pint <- list()
+cliffs_delta_educ <- list()
+
+# Compute Cliff’s Delta for each node
+for (node in names(r2_mat)) {
+  
+  # Extract data for this node (1000 rows × 4 columns)
+  node_data <- r2_mat[[node]]
+  
+  # Compare Political Interest (polint_2_2_l vs. polint_2_2_h)
+  cliffs_delta_pint[[node]] <- cliff.delta(node_data[, 1], node_data[, 2])
+  
+  # Compare Education (educ_low vs. educ_high)
+  cliffs_delta_educ[[node]] <- cliff.delta(node_data[, 3], node_data[, 4])
+}
+
+# Print Cliff’s Delta results for Political Interest
+cat("\nCliff’s Delta for Political Interest\n")
+print(cliffs_delta_pint)
+
+# Print Cliff’s Delta results for Education
+cat("\nCliff’s Delta for Education\n")
+print(cliffs_delta_educ)
+```
+
+```{r}
+# Define custom colors for Low vs. High groups
+custom_colors <- c("Low" = "#966FD6B3", "High" = "#008B8BB3")  # Corrected color mapping
+
+# Prepare data for plotting
+plot_data_pint <- do.call(rbind, lapply(names(r2_mat), function(node) {
+  data.frame(
+    Node = node,
+    R2 = c(r2_mat[[node]][, 1], r2_mat[[node]][, 2]),  # First col = polint_2_2_l, Second col = polint_2_2_h
+    Group = rep(c("Low", "High"), each = nrow(r2_mat[[node]]))  # Label groups
+  )
+}))
+
+# Ensure "Low" is always plotted first (before "High")
+plot_data_pint$Group <- factor(plot_data_pint$Group, levels = c("Low", "High"))
+
+# Create violin plot with facet wrapping
+violin_plot_pint <- ggplot(plot_data_pint, aes(x = Group, y = R2, fill = Group)) +
+  geom_violin(trim = TRUE, scale = "count", width = 0.8, alpha = 0.8) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, color = "black") +
+  facet_wrap(~ Node, scales = "free_y", ncol = 5) +  # Arrange nodes in facets
+  labs(title = "Political Interest - R² Comparison", x = "", y = "R² Values") +
+  scale_fill_manual(values = custom_colors) +  # Corrected color mapping
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.y = element_text(size = 14),
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    strip.text = element_text(size = 12, face = "bold"),  # Node names in facets
+    panel.spacing = unit(0.5, "lines"),
+    legend.position = "none"
+  )
+
+# Save plot
+ggsave(here("Output", "Article", "R2_Political_Interest_Violins.jpg"), 
+       plot = violin_plot_pint, width = 12, height = 12, dpi = 300, bg = "white")
+
+# Display the plot
+print(violin_plot_pint)
+```
+
+```{r}
+# Prepare data for plotting (Education)
+plot_data_educ <- do.call(rbind, lapply(names(r2_mat), function(node) {
+  data.frame(
+    Node = node,
+    R2 = c(r2_mat[[node]][, 3], r2_mat[[node]][, 4]),  # Third col = educ_low, Fourth col = educ_high
+    Group = rep(c("Low", "High"), each = nrow(r2_mat[[node]]))  # Label groups
+  )
+}))
+
+# Ensure "Low" is always plotted first (before "High")
+plot_data_educ$Group <- factor(plot_data_educ$Group, levels = c("Low", "High"))
+
+# Create violin plot with facet wrapping
+violin_plot_educ <- ggplot(plot_data_educ, aes(x = Group, y = R2, fill = Group)) +
+  geom_violin(trim = TRUE, scale = "count", width = 0.8, alpha = 0.8) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, color = "black") +
+  facet_wrap(~ Node, scales = "free_y", ncol = 5) +  # Arrange nodes in facets
+  labs(title = "Education - R² Comparison", x = "", y = "R² Values") +
+  scale_fill_manual(values = custom_colors) +  # Corrected color mapping
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.y = element_text(size = 14),
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    strip.text = element_text(size = 12, face = "bold"),  # Node names in facets
+    panel.spacing = unit(0.5, "lines"),
+    legend.position = "none"
+  )
+
+# Save plot
+ggsave(here("Output", "Article", "R2_Education_Violins.jpg"), 
+       plot = violin_plot_educ, width = 12, height = 12, dpi = 300, bg = "white")
+```
+
+
+#### R2 lollipop
+
+```{r}
+# Initialize an empty list to store predictions
+pred_list <- list()
+
+# Loop through datasets and store R2 values
+for (name in names(datasets)) {
+  # Fit MGM and get R2 predictions
+  data_matrix <- prepare_matrix_data(datasets[[name]])
+  mgm_model <- mgm(data_matrix, type = rep("g", length(shortnames)), 
+                   level = rep(1, length(shortnames)), lambdaSel = "EBIC", ruleReg = "OR")
+  pred_mgm <- predict(object = mgm_model, data = data_matrix, errorCon = 'R2')
+  
+  # Store the R2 values with the variable names
+  pred_list[[name]] <- tibble(Variable = pred_mgm$errors[, 1], 
+                              R2 = pred_mgm$errors[, 2], 
+                              group = name)
+}
+
+# Combine all predictions into a single data frame
+pred_df <- bind_rows(pred_list) %>%
+  pivot_wider(names_from = group, values_from = R2)
+
+# Save prediction table to Word file
+sjPlot::tab_df(pred_df, file = here("Output", "Supplement", "Tab_2.doc"))
+
+# Summarize the difference in R2 values between groups
+sum_pred_df <- tibble(
+  sum_educ = sum(pred_df$educ_high) - sum(pred_df$educ_low),
+  sum_pint = sum(pred_df$pol_int_high) - sum(pred_df$pol_int_low)
+)
+
+# Reshape the data without including 'att' group
+plot_data <- pred_df %>%
+  pivot_longer(cols = -Variable, names_to = "group", values_to = "value") %>%
+  filter(!str_detect(group, "att")) %>%
+  mutate(
+    type = case_when(
+      str_detect(group, "educ") ~ "educ",
+      str_detect(group, "pol_int") ~ "pint",
+      TRUE ~ NA_character_
+    ),
+    group = case_when(
+      str_detect(group, "_low") ~ "low",
+      str_detect(group, "_high") ~ "high",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(group))  # Remove rows with NA in group
+
+create_facet_plot <- function(data) {
+  # Prepare data for plotting
+  data_wide <- data %>%
+    pivot_wider(names_from = group, values_from = value) %>%
+    arrange(desc(high)) %>%
+    mutate(Variable = factor(Variable, levels = unique(Variable)))
+
+  # Create the plot with facet wrap
+  ggplot(data_wide) +
+    geom_segment(aes(x = Variable, xend = Variable, y = low, yend = high), color = "grey") +
+    geom_point(aes(x = Variable, y = low, color = "Low Group"), size = 3) +
+    geom_point(aes(x = Variable, y = high, color = "High Group"), size = 3) +
+    coord_flip() +
+    scale_color_manual(values = c("Low Group" = "#966FD6B3", "High Group" = "#008B8BB3")) + 
+    theme_ipsum() +
+    theme(
+      legend.position = "bottom",  # Move legend to bottom
+      axis.title.y = element_text(size = 14, face = "bold"),
+      plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),  # Match title size with aspl_violin_plot
+      legend.title = element_text(size = 12, face = "bold")
+    ) +
+    facet_wrap(~ type, scales = "fixed",  # Ensure same x-axis scale for all panels
+               labeller = as_labeller(c("educ" = "Education", "pint" = "Political Interest"))) +  # Change panel labels
+    xlab("") +
+    ylab("R²") +  # x-axis label present for both panels
+    ggtitle("Comparison of node-wise R²")  # General title for the plot
+}
+
+# Create the plot
+facet_r2_plot <- create_facet_plot(plot_data)
+
+```
+
+### ASPL
+
+#### Mann-Whitney U Test (ASPL)
+
+```{r}
+# # Define function to extract ASPL from bootstrapped networks
+# extract_aspl_values <- function(df_boot) {
+#   
+#   # Extract adjacency matrices from bootstrapped results
+#   matrix_list <- lapply(1:10000, function(i) {
+#     df_boot[["boots"]][[i]][["graph"]]
+#   })
+#   
+#   # Ensure all values are non-negative
+#   matrix_list <- lapply(matrix_list, function(mat) abs(mat))
+#   
+#   # Calculate ASPL for each matrix
+#   aspl_values <- sapply(matrix_list, function(mat) {
+#     aspl <- tryCatch({
+#       pathlengths(mat, weighted = TRUE)$ASPL  # Compute ASPL
+#     }, error = function(e) {
+#       return(NA)  # If error, return NA
+#     })
+#     return(aspl)
+#   })
+#   
+#   # Remove NAs (if any calculations failed)
+#   aspl_values <- na.omit(aspl_values)
+#   
+#   return(aspl_values)  # Return vector of ASPL values
+# }
+# 
+# # List of datasets to process
+# datasets <- list(
+#   "aspl_pint_l" = df.boot_pint_l_2_2_pc,
+#   "aspl_pint_h" = df.boot_pint_h_2_2_pc,
+#   "aspl_educ_l" = df.boot_educ_l_pc,
+#   "aspl_educ_h" = df.boot_educ_h_pc
+# )
+# 
+# # Loop through datasets and extract ASPL values
+# aspl_results <- list()
+# 
+# for (name in names(datasets)) {
+#   cat("Processing:", name, "\n")
+#   aspl_results[[name]] <- extract_aspl_values(datasets[[name]])
+# }
+
+#Load
+load(file = here("Input", "ASPL", "ASPL_all.RData"))
+
+# Save
+save(aspl_results, file = here("Input", "ASPL", "ASPL_all"))
+```
+
+```{r}
+# Perform Mann-Whitney U Tests
+mann_whitney_results <- list(
+  "Political Interest" = wilcox.test(aspl_results$aspl_pint_l, aspl_results$aspl_pint_h, alternative = "two.sided"),
+  "Education" = wilcox.test(aspl_results$aspl_educ_l, aspl_results$aspl_educ_h, alternative = "two.sided")
+)
+
+# Print results
+for (name in names(mann_whitney_results)) {
+  cat("\n----------------------------------\n")
+  cat("Mann-Whitney U Test for:", name, "\n")
+  print(mann_whitney_results[[name]])
+  cat("----------------------------------\n")
+}
+```
+
+```{r}
+# Compute Cliff's Delta effect sizes
+cliffs_delta_results <- list(
+  "Political Interest" = cliff.delta(aspl_results$aspl_pint_l, aspl_results$aspl_pint_h),
+  "Education" = cliff.delta(aspl_results$aspl_educ_l, aspl_results$aspl_educ_h)
+)
+
+# Print results
+for (name in names(cliffs_delta_results)) {
+  cat("\n----------------------------------\n")
+  cat("Cliff’s Delta for:", name, "\n")
+  print(cliffs_delta_results[[name]])
+  cat("----------------------------------\n")
+}
+```
+```{r}
+# Prepare data for visualization
+plot_data <- data.frame(
+  Type = rep(c("Political Interest", "Political Interest", "Education", "Education"), 
+             times = c(length(aspl_results$aspl_pint_l), length(aspl_results$aspl_pint_h), length(aspl_results$aspl_educ_l), length(aspl_results$aspl_educ_h))),
+  Group = rep(c("Low", "High", "Low", "High"), 
+              times = c(length(aspl_results$aspl_pint_l), length(aspl_results$aspl_pint_h), length(aspl_results$aspl_educ_l), length(aspl_results$aspl_educ_h))),
+  ASPL = c(aspl_results$aspl_pint_l, aspl_results$aspl_pint_h, aspl_results$aspl_educ_l, aspl_results$aspl_educ_h)
+)
+
+# Define custom colors for Low vs High partitions
+custom_colors <- c("Low" = "#966FD6B3", "High" = "#008B8BB3")
+
+# Create function to generate violin plots
+create_violin_plot <- function(data, title) {
+  ggplot(data, aes(x = Group, y = ASPL, fill = Group)) +
+    geom_violin(trim = TRUE, scale = "count", width = 0.8, alpha = 0.8) +
+    geom_boxplot(width = 0.1, outlier.shape = NA, color = "black") +
+    labs(title = title, x = "", y = "ASPL") +
+    scale_fill_manual(values = custom_colors) +
+    theme_minimal(base_size = 14) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.title.y = element_text(size = 14),
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+      plot.margin = margin(10, 10, 10, 10),
+      legend.position = "none"
+    )
+}
+
+# Create individual plots
+p1 <- create_violin_plot(subset(plot_data, Type == "Political Interest"), "Political Interest")
+p2 <- create_violin_plot(subset(plot_data, Type == "Education"), "Education")
+
+# Arrange plots vertically
+final_plot <- p1 / p2 + plot_layout(heights = c(1, 1))
+
+# Save final plot
+ggsave(here("Output", "Article", "ASPL_VIOLIN.jpg"), final_plot, width = 12, height = 8, dpi = 300)
+```
+
+
+#### Violins (bootstrapped CIs)
+
+```{r}
+# Function to calculate ASPL, exclude outliers, and return bootstrapped 90% asymmetrical CIs
+aspl_from_boots_with_ci <- function(df_boot) {
+  
+  # Extract the matrices
+  matrix_list <- lapply(1:10000, function(i) {
+    df_boot[["boots"]][[i]][["graph"]]
+  })
+  
+  # Ensure that all values in the matrices are non-negative by taking the absolute value
+  matrix_list <- lapply(matrix_list, function(mat) {
+    mat <- abs(mat)  # Take the absolute value of all matrix elements
+    return(mat)
+  })
+  
+  # Calculate ASPL for each matrix using pathlengths function from NetworkToolbox
+  aspl_values <- sapply(matrix_list, function(mat) {
+    aspl <- tryCatch({
+      pathlengths(mat, weighted = TRUE)$ASPL  # Calculate ASPL for the matrix
+    }, error = function(e) {
+      return(NA)  # If calculation fails, return NA
+    })
+    return(aspl)
+  })
+  
+  # Remove any NA values (in case of calculation errors)
+  aspl_values <- aspl_values[!is.na(aspl_values)]
+  
+  # Calculate mean and standard deviation of ASPL values for this group
+  mean_aspl <- mean(aspl_values, na.rm = TRUE)
+  sd_aspl <- sd(aspl_values, na.rm = TRUE)
+  
+  # Exclude outliers: keep only values within ±3 standard deviations from the mean for this group
+  aspl_values_filtered <- aspl_values #[aspl_values >= (mean_aspl - 3 * sd_aspl) & 
+                                      # aspl_values <= (mean_aspl + 3 * sd_aspl)]
+  
+  # Calculate asymmetrical 90% bootstrapped confidence intervals using quantiles
+  ci_lower <- quantile(aspl_values_filtered, 0.025, na.rm = TRUE)  # 2.5th percentile
+  ci_upper <- quantile(aspl_values_filtered, 0.925, na.rm = TRUE)  # 92.5th percentile
+  
+  # Return the ASPL values with outliers removed along with CIs and mean
+  return(list(mean_aspl = mean(aspl_values_filtered, na.rm = TRUE),
+              ci_lower = ci_lower, 
+              ci_upper = ci_upper,
+              aspl_values = aspl_values_filtered))  # Also return the filtered values for box plot
+}
+
+# Apply the updated function to datasets for political interest and education
+#aspl_pint_l_2_2_pc <- aspl_from_boots_with_ci(df.boot_pint_l_2_2_pc)
+#aspl_pint_h_2_2_pc <- aspl_from_boots_with_ci(df.boot_pint_h_2_2_pc)
+#
+#aspl_educ_l_pc <- aspl_from_boots_with_ci(df.boot_educ_l_pc)
+#aspl_educ_h_pc <- aspl_from_boots_with_ci(df.boot_educ_h_pc)
+
+#Load
+load(file = here("Input", "ASPL", "aspl_educ_h.RData"))
+load(file = here("Input", "ASPL", "aspl_educ_l.RData"))
+load(file = here("Input", "ASPL", "aspl_pint_h.RData"))
+load(file = here("Input", "ASPL", "aspl_pint_l.RData"))
+
+# Save
+save(aspl_pint_l_2_2_pc, file = here("Input", "ASPL", "aspl_pint_l.RData"))
+save(aspl_pint_h_2_2_pc, file = here("Input", "ASPL", "aspl_pint_h.RData"))
+
+save(aspl_educ_l_pc, file = here("Input", "ASPL", "aspl_educ_l.RData"))
+save(aspl_educ_h_pc, file = here("Input", "ASPL", "aspl_educ_h.RData"))
+
+# Prepare the data for box plot (using all ASPL values, including outliers)
+plot_data <- data.frame(
+  type = c(rep("pint", length(aspl_pint_l_2_2_pc$aspl_values)), rep("pint", length(aspl_pint_h_2_2_pc$aspl_values)),
+           rep("educ", length(aspl_educ_l_pc$aspl_values)), rep("educ", length(aspl_educ_h_pc$aspl_values))),
+  group = c(rep("low", length(aspl_pint_l_2_2_pc$aspl_values)), rep("high", length(aspl_pint_h_2_2_pc$aspl_values)),
+            rep("low", length(aspl_educ_l_pc$aspl_values)), rep("high", length(aspl_educ_h_pc$aspl_values))),
+  aspl_values = c(aspl_pint_l_2_2_pc$aspl_values, aspl_pint_h_2_2_pc$aspl_values, 
+                  aspl_educ_l_pc$aspl_values, aspl_educ_h_pc$aspl_values)
+)
+
+# Rename 'type' categories for better labels
+plot_data <- plot_data %>%
+  mutate(
+    type = case_when(
+      type == "educ" ~ "Education",
+      type == "pint" ~ "Political Interest"
+    )
+  )
+
+# Calculate mean and standard deviation of ASPL values for each group and type
+plot_data_summary <- plot_data %>%
+  group_by(type, group) %>%
+  summarise(mean_aspl = mean(aspl_values, na.rm = TRUE),
+            sd_aspl = sd(aspl_values, na.rm = TRUE), .groups = "drop")  # Include summary stats
+
+# Merge summary statistics back into plot_data for each observation
+plot_data <- plot_data %>%
+  left_join(plot_data_summary, by = c("type", "group"))
+
+# Identify outliers (optional; only for highlighting, but not excluding)
+plot_data_outliers <- plot_data %>%
+  filter(aspl_values > 20 & type == "Political Interest")  # Outliers only for Political Interest above 20
+
+# Recalculate confidence intervals (without filtering out outliers)
+plot_data_summary_filtered <- plot_data %>%
+  group_by(type, group) %>%
+  summarise(
+    mean_aspl = mean(aspl_values, na.rm = TRUE),
+    ci_lower = quantile(aspl_values, 0.025, na.rm = TRUE),  # Asymmetrical 90% CI lower bound (2.5th percentile)
+    ci_upper = quantile(aspl_values, 0.925, na.rm = TRUE),  # Asymmetrical 90% CI upper bound (92.5th percentile)
+    .groups = "drop"
+  )
+
+# Create the violin plot with boxplot inside, horizontal error bars, and correct facets
+aspl_violin_plot <- ggplot(plot_data, aes(y = group, x = aspl_values, fill = group)) +
+  geom_violin(scale = "count", width = 0.6) +  # Violin plot
+  geom_boxplot(width = 0.1, position = position_dodge(width = 0.9), alpha = 0.6) +  # Add a boxplot inside the violin plot
+  geom_errorbar(data = plot_data_summary_filtered, aes(x = mean_aspl, xmin = ci_lower, xmax = ci_upper), 
+                width = 0.2, linewidth = 0.7, color = "black") +  # Horizontal error bars based on data
+  geom_point(data = plot_data_outliers, aes(x = aspl_values, y = group), color = "red", size = 2) +  # Outliers as red dots
+  theme_ipsum() +  # Apply theme
+  labs(title = "ASPL Distribution by Group with 90% CIs", x = "ASPL", y = NULL) +  # Adjust labels
+  facet_wrap(~ type, scales = "free_x") +  # Facet by type (Education vs Political Interest), with free x-axis scales
+  scale_fill_manual(values = c("low" = "#966FD6B3", "high" = "#008B8BB3")) +  # Custom colors for groups
+  scale_x_continuous(limits = c(NA, 20), expand = expansion(mult = 0.05)) +  # Restrict x-axis to max 20 for Political Interest
+  theme(
+    axis.title.y = element_text(),  # Keep the axis title consistent for the y-axis
+    legend.position = "none",  # Suppress the legend
+    plot.title = element_text(hjust = 0.5),  # Center the plot title
+    panel.border = element_blank()  # Clean look without borders
+  )
+
+# Display the plot
+print(aspl_violin_plot)
+
+```
+
+### R2 sum
+
+```{r}
+# Function to calculate the average R² with bootstrapped 95% CIs
+r2_from_boots_with_ci <- function(df_boot) {
+  
+  # Extract the matrices
+  matrix_list <- lapply(1:10000, function(i) {
+    df_boot[["boots"]][[i]][["graph"]]
+  })
+  
+  # Ensure that all values in the matrices are non-negative by taking the absolute value
+  matrix_list <- lapply(matrix_list, function(mat) {
+    mat <- abs(mat)  # Take the absolute value of all matrix elements
+    return(mat)
+  })
+  
+  # Calculate R² for each matrix as sum of non-zero edges divided by 2 (for symmetry)
+  r2_values <- sapply(matrix_list, function(mat) {
+    node_sums <- apply(mat, 2, function(col) {
+      non_zero_edges <- col[col != 0]  # Exclude zero edges
+      return(sum(non_zero_edges))
+    })
+    
+    mean_r2 <- mean(node_sums) / 2  # Adjust for symmetry
+    return(mean_r2)
+  })
+  
+  # Calculate mean and standard deviation of R² values for this group
+  mean_r2 <- mean(r2_values, na.rm = TRUE)
+  sd_r2 <- sd(r2_values, na.rm = TRUE)
+  
+  # Exclude outliers: keep only values within ±3 standard deviations from the mean for this group
+  r2_values_filtered <- r2_values#[r2_values >= (mean_r2 - 3 * sd_r2) & 
+                                 # r2_values <= (mean_r2 + 3 * sd_r2)]
+  
+  # Calculate 95% bootstrapped confidence intervals using quantiles
+  ci_lower <- quantile(r2_values_filtered, 0.025, na.rm = TRUE)  # 2.5th percentile for lower bound
+  ci_upper <- quantile(r2_values_filtered, 0.925, na.rm = TRUE)  # 92.5th percentile for upper bound
+
+  
+  # Return the R² values with outliers removed along with CIs and mean
+  return(list(mean_r2 = mean(r2_values_filtered, na.rm = TRUE),
+              ci_lower = ci_lower, 
+              ci_upper = ci_upper,
+              r2_values = r2_values_filtered))  # Also return the filtered values for box plot
+}
+
+# Apply this function to datasets for political interest and education
+r2_pint_l_2_1_pc <- r2_from_boots_with_ci(df.boot_pint_l_2_1_pc)
+r2_pint_h_2_1_pc <- r2_from_boots_with_ci(df.boot_pint_h_2_1_pc)
+
+r2_educ_l_pc <- r2_from_boots_with_ci(df.boot_educ_l_pc)
+r2_educ_h_pc <- r2_from_boots_with_ci(df.boot_educ_h_pc)
+
+# Prepare the data for box plot with R² values
+plot_data <- data.frame(
+  type = c(rep("pint", length(r2_pint_l_2_1_pc$r2_values)), rep("pint", length(r2_pint_h_2_1_pc$r2_values)),
+           rep("educ", length(r2_educ_l_pc$r2_values)), rep("educ", length(r2_educ_h_pc$r2_values))),
+  group = c(rep("low", length(r2_pint_l_2_1_pc$r2_values)), rep("high", length(r2_pint_h_2_1_pc$r2_values)),
+            rep("low", length(r2_educ_l_pc$r2_values)), rep("high", length(r2_educ_h_pc$r2_values))),
+  r2_values = c(r2_pint_l_2_1_pc$r2_values, r2_pint_h_2_1_pc$r2_values, 
+                r2_educ_l_pc$r2_values, r2_educ_h_pc$r2_values),
+  mean_r2 = c(rep(r2_pint_l_2_1_pc$mean_r2, length(r2_pint_l_2_1_pc$r2_values)),
+              rep(r2_pint_h_2_1_pc$mean_r2, length(r2_pint_h_2_1_pc$r2_values)),
+              rep(r2_educ_l_pc$mean_r2, length(r2_educ_l_pc$r2_values)),
+              rep(r2_educ_h_pc$mean_r2, length(r2_educ_h_pc$r2_values))),
+  ci_lower = c(rep(r2_pint_l_2_1_pc$ci_lower, length(r2_pint_l_2_1_pc$r2_values)),
+               rep(r2_pint_h_2_1_pc$ci_lower, length(r2_pint_h_2_1_pc$r2_values)),
+               rep(r2_educ_l_pc$ci_lower, length(r2_educ_l_pc$r2_values)),
+               rep(r2_educ_h_pc$ci_lower, length(r2_educ_h_pc$r2_values))),
+  ci_upper = c(rep(r2_pint_l_2_1_pc$ci_upper, length(r2_pint_l_2_1_pc$r2_values)),
+               rep(r2_pint_h_2_1_pc$ci_upper, length(r2_pint_h_2_1_pc$r2_values)),
+               rep(r2_educ_l_pc$ci_upper, length(r2_educ_l_pc$r2_values)),
+               rep(r2_educ_h_pc$ci_upper, length(r2_educ_h_pc$r2_values)))
+)
+
+# Create the violin plot and add CIs using geom_errorbar
+r2_plot <- ggplot(plot_data, aes(y = group, x = r2_values, fill = group)) +  # Horizontal violins
+  geom_violin(scale = "count", width = 0.6) +  # Use violin plot to represent distribution
+  geom_boxplot(width = 0.1, position = position_dodge(width = 0.9), alpha = 0.6) +  # Boxplot inside the violin
+  geom_errorbar(aes(x = mean_r2, xmin = ci_lower, xmax = ci_upper),  # Horizontal error bars
+                width = 0.2, linewidth = 0.7, color = "black") +  # Add CI error bars
+  scale_fill_manual(values = c("low" = "#966FD6B3", "high" = "#008B8BB3")) +  # Custom color scheme
+  labs(title = "R² Distribution by Group with 90% CIs", x = "R²", y = NULL, fill = "Group") +  # Adjust labels and title
+  facet_wrap(~ type, labeller = as_labeller(c("educ" = "Education", "pint" = "Political Interest")), scales = "fixed") +  # Set panel labels and equal x-axis
+  theme_ipsum() +  # Apply the theme for consistent styling
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),  # Center and enlarge title
+    axis.title.y = element_text(),  # Keep the axis title consistent for the y-axis
+    legend.position = "none",  # Suppress the legend
+    panel.border = element_blank()  # Clean look without borders
+  )
+
+# Display the plot
+print(r2_plot)
+
+```
+
+
+### Figure for H1 and H2
+
+```{r}
+# Save
+Figure_3 <- (aspl_violin_plot / facet_r2_plot / r2_plot) +
+  plot_layout(heights = c(1, 2, 1))
+
+ggsave(here("Output", "Article", "Figure_3.jpg"), Figure_3, width = 12, height = 16, dpi = 300)
+```
+
+
+## H3
+
+### Mnm of educ and pint
+
+```{r}
+# Data prep
+mnm_educ_data = IPBS %>% 
+  select(L_R: ukrai, educ_cat) %>% 
+  mutate(educ_cat = case_when(
+    educ_cat == "Degree or more" ~ 1,
+    educ_cat == "Less than university" ~ 0)) %>% 
+  as.matrix()
+
+mnm_pint_data = IPBS %>% 
+  select(L_R: ukrai, pol_int) %>% 
+  mutate(pol_int = case_when(
+    pol_int %in% c(1,2) ~ 0,
+    pol_int %in% c(3,4) ~ 1
+  )) %>% 
+  as.matrix()
+
+# mnms
+mnm_educ = mgm(mnm_educ_data, type = c(rep("g", 19), "c"), level = c(rep(1, 19), 2),
+               moderators = 20, lambdaSel = "EBIC", ruleReg = "OR", binarySign = T)
+
+mnm_pint = mgm(mnm_pint_data, type = c(rep("g", 19), "c"), level = c(rep(1, 19), 2),
+               moderators = 20, lambdaSel = "EBIC", ruleReg = "OR", binarySign = T)
+
+# Inspecting interactions
+mnm_pint$interactions$indicator #61 pairwise, 23 moderations
+mnm_educ$interactions$indicator #72 pairwise, 9 moderations
+
+
+mnm_educ$interactions$indicator
+```
+
+### mnm network plot for vote
+
+```{r}
+#Enlarge objects
+shortnames = c("L_R","PTV_PD","PTV_FI","PTV_L","PTV_M5S","PTV_FDI","adopt","abort","eutha","marria","redis","flat_t","m_wage","cit_in","globa",     
+                "immig","big_go","pub_pri","ukrai","vote_cat")
+
+Totalgroup_comm <- list(
+  "Symbolic" = c(1:6),
+  "Operational" = c(7:19),
+  "Vote choice" = c(20)
+)
+
+Totalgroup_cols <- c("#966FD6B3", "#008B8BB3", "#FFFF00")  
+
+# Data prep
+mnm_vote_data <- IPBS %>% 
+  select(L_R:ukrai, vote_cat) %>% 
+  mutate(vote_cat = case_when(
+    vote_cat == "Sin" ~ 0,
+    vote_cat == "M5S" ~ 1,  
+    vote_cat == "Dx" ~ 2
+  )) %>% 
+  na.omit() %>% 
+  as.matrix()
+
+# Fit the mgm model
+mnm_vote <- mgm(
+  data = mnm_vote_data,
+  type = c(rep("g", 19), "c"),  
+  level = c(rep(1, 19), 3),     
+  moderators = 20,              
+  lambdaSel = "EBIC",           
+  ruleReg = "OR",
+  binarySign = T
+)
+
+# Conditioning the model on each level of vote_cat (Left and Right only)
+cond0 <- condition(object = mnm_vote, values = list('20' = 0))  # Left (Sin)
+cond1 <- condition(object = mnm_vote, values = list('20' = 1))  # M5S
+cond2 <- condition(object = mnm_vote, values = list('20' = 2))  #DX
+
+# Initial plots to generate layouts
+Graph_cond_0 <- qgraph(cond0$pairwise$wadj)
+Graph_cond_1 <- qgraph(cond1$pairwise$wadj)
+Graph_cond_2 <- qgraph(cond2$pairwise$wadj)
+
+# Multiplot for Left and Right only
+jpeg(here("Output", "Article", "Figure_4.jpg"), 
+     height = 8000, width = 8000, quality = 1000)  # Adjust image size as needed
+
+# Create a common layout based on the two conditions
+L <- averageLayout(Graph_cond_0, Graph_cond_1, Graph_cond_2, layout = "spring")
+
+# Matrix layout for the graphs (1 row, 2 columns)
+lmat <- matrix(1:3, 1, 3)
+
+# Start plotting
+layout(lmat, width = c(1, 1, 1))
+
+# Generate plots for Left (Sin)
+set.seed(1)
+Graph_cond_0 <- qgraph(
+  cond0$pairwise$wadj, layout = L, fade = TRUE,  # Enable edge fading
+  labels = shortnames, vTrans = 255,  # Transparency setting
+  groups = Totalgroup_comm,  
+  color = Totalgroup_cols,  
+  legend = FALSE, title = "Left", title.cex = 12,
+  edge.color = cond0$pairwise$edgecolor_cb,  # Ensure edge colors reflect the weights
+  borders = TRUE, vsize = 10, esize = 15, 
+  theme = "colorblind"  # Explicit alpha control to help edge fading  # Consistent scaling across plots
+)
+
+# Generate plots for Right (Dx)
+set.seed(1)
+Graph_cond_1 <- qgraph(
+  cond1$pairwise$wadj, layout = L, fade = TRUE,  # Enable edge fading
+  labels = shortnames,  
+  groups = Totalgroup_comm, 
+  color = Totalgroup_cols, 
+  legend = FALSE, title = "M5S", title.cex = 12,
+  edge.color = cond1$pairwise$edgecolor_cb,  # Ensure edge colors reflect the weights
+  borders = TRUE, vsize = 10, esize = 15,   # Use edge.alpha to control transparency based on edge weight  # Set a lower cut-off threshold
+  theme = "colorblind"  # Explicit alpha control to help edge fading  # Consistent scaling across plots
+)
+
+Graph_cond_2 <- qgraph(
+  cond2$pairwise$wadj, layout = L, fade = TRUE,  # Enable edge fading
+  labels = shortnames,  
+  groups = Totalgroup_comm, 
+  color = Totalgroup_cols, 
+  legend = FALSE, title = "Right", title.cex = 12,
+  edge.color = cond2$pairwise$edgecolor_cb,  # Ensure edge colors reflect the weights
+  borders = TRUE, vsize = 10, esize = 15, 
+  theme = "colorblind"  # Explicit alpha control to help edge fading  # Consistent scaling across plots
+)
+
+# Finish and save the plot
+dev.off()
+mnm_vote$interactions[2]
+
+```
+
+
+### Moderation plot
+
+
+#### educ
+
+```{r}
+# Extract signed interactions from mnm_educ
+
+# For three-way interactions
+edge_1_3 = showInteraction(object = mnm_educ, int = c(1, 3, 20))
+edge_1_3 = edge_1_3$edgeweight * edge_1_3$sign
+
+edge_2_5 = showInteraction(object = mnm_educ, int = c(2, 5, 20))
+edge_2_5 = edge_2_5$edgeweight * edge_2_5$sign
+
+edge_4_5 = showInteraction(object = mnm_educ, int = c(4, 5, 20))
+edge_4_5 = edge_4_5$edgeweight * edge_4_5$sign
+
+edge_4_8 = showInteraction(object = mnm_educ, int = c(4, 8, 20))
+edge_4_8 = edge_4_8$edgeweight * edge_4_8$sign
+
+edge_6_12 = showInteraction(object = mnm_educ, int = c(6, 12, 20))
+edge_6_12 = edge_6_12$edgeweight * edge_6_12$sign
+
+edge_7_9 = showInteraction(object = mnm_educ, int = c(7, 9, 20))
+edge_7_9 = edge_7_9$edgeweight * edge_7_9$sign
+
+edge_7_14 = showInteraction(object = mnm_educ, int = c(7, 14, 20))
+edge_7_14 = edge_7_14$edgeweight * edge_7_14$sign
+
+edge_12_15 = showInteraction(object = mnm_educ, int = c(12, 15, 20))
+edge_12_15 = edge_12_15$edgeweight * edge_12_15$sign
+
+edge_14_18 = showInteraction(object = mnm_educ, int = c(14, 18, 20))
+edge_14_18 = edge_14_18$edgeweight * edge_14_18$sign
+
+# For two-way interactions (edgeweights)
+ew_1_3 = showInteraction(object = mnm_educ, int = c(1, 3))
+ew_1_3 = ew_1_3$edgeweight * ew_1_3$sign
+
+ew_2_5 = showInteraction(object = mnm_educ, int = c(2, 5))
+ew_2_5 = ew_2_5$edgeweight * ew_2_5$sign
+
+ew_4_5 = showInteraction(object = mnm_educ, int = c(4, 5))
+ew_4_5 = ew_4_5$edgeweight * ew_4_5$sign
+
+ew_4_8 = showInteraction(object = mnm_educ, int = c(4, 8))
+ew_4_8 = ew_4_8$edgeweight * ew_4_8$sign
+
+ew_6_12 = showInteraction(object = mnm_educ, int = c(6, 12))
+ew_6_12 = ew_6_12$edgeweight * ew_6_12$sign
+
+ew_7_9 = showInteraction(object = mnm_educ, int = c(7, 9))
+ew_7_9 = ew_7_9$edgeweight * ew_7_9$sign
+
+ew_7_14 = showInteraction(object = mnm_educ, int = c(7, 14))
+ew_7_14 = ew_7_14$edgeweight * ew_7_14$sign
+
+ew_12_15 = showInteraction(object = mnm_educ, int = c(12, 15))
+ew_12_15 = ew_12_15$edgeweight * ew_12_15$sign
+
+ew_14_18 = showInteraction(object = mnm_educ, int = c(14, 18))
+ew_14_18 = ew_14_18$edgeweight * ew_14_18$sign
+
+```
+
+```{r}
+# Store in a df
+# Create an empty dataframe to store the results
+signed_mod_educ <- data.frame(Node1 = integer(), Node2 = integer(), Node3 = integer(), 
+                              SignedWeight = numeric(), EW_SignedWeight = numeric())
+
+# List of edges (replace with the specific edges you've already created)
+edges <- list(
+  "edge_1_3", "edge_2_5", "edge_4_5", "edge_4_8", "edge_6_12", "edge_7_9", "edge_7_14", 
+  "edge_12_15", "edge_14_18"
+)
+
+# List of corresponding ew_* values for two-way interactions
+ew_edges <- list(
+  "ew_1_3", "ew_2_5", "ew_4_5", "ew_4_8", "ew_6_12", "ew_7_9", "ew_7_14", 
+  "ew_12_15", "ew_14_18"
+)
+
+# Corresponding node triples for each interaction
+nodes <- list(
+  c(1, 3, 20), c(2, 5, 20), c(4, 5, 20), c(4, 8, 20), c(6, 12, 20), c(7, 9, 20), 
+  c(7, 14, 20), c(12, 15, 20), c(14, 18, 20)
+)
+
+# Loop through each edge and append it to the dataframe
+for (i in seq_along(edges)) {
+  # Get the signed weight from the edge and ew objects
+  signed_weight <- get(edges[[i]])
+  ew_signed_weight <- get(ew_edges[[i]])
+  
+  # Append to the dataframe
+  signed_mod_educ <- rbind(signed_mod_educ, 
+                           data.frame(Node1 = nodes[[i]][1], 
+                                      Node2 = nodes[[i]][2], 
+                                      Node3 = nodes[[i]][3], 
+                                      SignedWeight = signed_weight,
+                                      EW_SignedWeight = ew_signed_weight))
+}
+
+# Recode Node1 and Node2 based on shortnames
+signed_mod_educ <- signed_mod_educ %>%
+  mutate(Node1 = shortnames[Node1],  # Recode Node1 based on shortnames
+         Node2 = shortnames[Node2])
+
+# Remove Node3
+signed_mod_educ <- signed_mod_educ %>%
+  select(-Node3)
+
+# Step 2: Create the predicted0 column (EW_SignedWeight + (SignedWeight * 0))
+signed_mod_educ <- signed_mod_educ %>%
+  mutate(predicted0 = EW_SignedWeight + (SignedWeight * 0))
+
+# Step 3: Create the predicted1 column (EW_SignedWeight + (SignedWeight * 1))
+signed_mod_educ <- signed_mod_educ %>%
+  mutate(predicted1 = EW_SignedWeight + (SignedWeight * 1))
+
+# Step 4: Create the Node column combining Node1 and Node2
+signed_mod_educ <- signed_mod_educ %>%
+  mutate(Node = paste(Node1, Node2, sep = "-"))
+```
+
+
+#### pint
+
+```{r}
+# Extract signed interactions for mnm_pint
+edge_1_11 = showInteraction(object = mnm_pint, int = c(1,11,20)) 
+edge_1_11 = edge_1_11$edgeweight * edge_1_11$sign
+
+edge_1_12 = showInteraction(object = mnm_pint, int = c(1,12,20)) 
+edge_1_12 = edge_1_12$edgeweight * edge_1_12$sign
+
+edge_1_18 = showInteraction(object = mnm_pint, int = c(1,18,20)) 
+edge_1_18 = edge_1_18$edgeweight * edge_1_18$sign
+
+edge_2_16 = showInteraction(object = mnm_pint, int = c(2,16,20)) 
+edge_2_16 = edge_2_16$edgeweight * edge_2_16$sign
+
+edge_3_4 = showInteraction(object = mnm_pint, int = c(3,4,20)) 
+edge_3_4 = edge_3_4$edgeweight * edge_3_4$sign
+
+edge_3_8 = showInteraction(object = mnm_pint, int = c(3,8,20)) 
+edge_3_8 = edge_3_8$edgeweight * edge_3_8$sign
+
+edge_4_8 = showInteraction(object = mnm_pint, int = c(4,8,20)) 
+edge_4_8 = edge_4_8$edgeweight * edge_4_8$sign
+
+edge_4_12 = showInteraction(object = mnm_pint, int = c(4,12,20)) 
+edge_4_12 = edge_4_12$edgeweight * edge_4_12$sign
+
+edge_4_13 = showInteraction(object = mnm_pint, int = c(4,13,20)) 
+edge_4_13 = edge_4_13$edgeweight * edge_4_13$sign
+
+edge_5_14 = showInteraction(object = mnm_pint, int = c(5,14,20)) 
+edge_5_14 = edge_5_14$edgeweight * edge_5_14$sign
+
+edge_5_19 = showInteraction(object = mnm_pint, int = c(5,19,20)) 
+edge_5_19 = edge_5_19$edgeweight * edge_5_19$sign
+
+edge_6_15 = showInteraction(object = mnm_pint, int = c(6,15,20)) 
+edge_6_15 = edge_6_15$edgeweight * edge_6_15$sign
+
+edge_7_15 = showInteraction(object = mnm_pint, int = c(7,15,20)) 
+edge_7_15 = edge_7_15$edgeweight * edge_7_15$sign
+
+edge_8_12 = showInteraction(object = mnm_pint, int = c(8,12,20)) 
+edge_8_12 = edge_8_12$edgeweight * edge_8_12$sign
+
+edge_10_16 = showInteraction(object = mnm_pint, int = c(10,16,20)) 
+edge_10_16 = edge_10_16$edgeweight * edge_10_16$sign
+
+edge_11_16 = showInteraction(object = mnm_pint, int = c(11,16,20)) 
+edge_11_16 = edge_11_16$edgeweight * edge_11_16$sign
+
+edge_11_17 = showInteraction(object = mnm_pint, int = c(11,17,20)) 
+edge_11_17 = edge_11_17$edgeweight * edge_11_17$sign
+
+edge_12_17 = showInteraction(object = mnm_pint, int = c(12,17,20)) 
+edge_12_17 = edge_12_17$edgeweight * edge_12_17$sign
+
+edge_13_17 = showInteraction(object = mnm_pint, int = c(13,17,20)) 
+edge_13_17 = edge_13_17$edgeweight * edge_13_17$sign
+
+edge_14_15 = showInteraction(object = mnm_pint, int = c(14,15,20)) 
+edge_14_15 = edge_14_15$edgeweight * edge_14_15$sign
+
+edge_14_18 = showInteraction(object = mnm_pint, int = c(14,18,20)) 
+edge_14_18 = edge_14_18$edgeweight * edge_14_18$sign
+
+edge_15_19 = showInteraction(object = mnm_pint, int = c(15,19,20)) 
+edge_15_19 = edge_15_19$edgeweight * edge_15_19$sign
+
+edge_16_19 = showInteraction(object = mnm_pint, int = c(16,19,20)) 
+edge_16_19 = edge_16_19$edgeweight * edge_16_19$sign
+
+# Extract edge weights (ew_) for two-way interactions
+ew_1_11 = showInteraction(object = mnm_pint, int = c(1,11)) 
+ew_1_11 = ew_1_11$edgeweight * ew_1_11$sign
+
+ew_1_12 = showInteraction(object = mnm_pint, int = c(1,12)) 
+ew_1_12 = ew_1_12$edgeweight * ew_1_12$sign
+
+ew_1_18 = showInteraction(object = mnm_pint, int = c(1,18)) 
+ew_1_18 = ew_1_18$edgeweight * ew_1_18$sign
+
+ew_2_16 = showInteraction(object = mnm_pint, int = c(2,16)) 
+ew_2_16 = ew_2_16$edgeweight * ew_2_16$sign
+
+ew_3_4 = showInteraction(object = mnm_pint, int = c(3,4)) 
+ew_3_4 = ew_3_4$edgeweight * ew_3_4$sign
+
+ew_3_8 = showInteraction(object = mnm_pint, int = c(3,8)) 
+ew_3_8 = ew_3_8$edgeweight * ew_3_8$sign
+
+ew_4_8 = showInteraction(object = mnm_pint, int = c(4,8)) 
+ew_4_8 = ew_4_8$edgeweight * ew_4_8$sign
+
+ew_4_12 = showInteraction(object = mnm_pint, int = c(4,12)) 
+ew_4_12 = ew_4_12$edgeweight * ew_4_12$sign
+
+ew_4_13 = showInteraction(object = mnm_pint, int = c(4,13)) 
+ew_4_13 = ew_4_13$edgeweight * ew_4_13$sign
+
+ew_5_14 = showInteraction(object = mnm_pint, int = c(5,14)) 
+ew_5_14 = ew_5_14$edgeweight * ew_5_14$sign
+
+ew_5_19 = showInteraction(object = mnm_pint, int = c(5,19)) 
+ew_5_19 = ew_5_19$edgeweight * ew_5_19$sign
+
+ew_6_15 = showInteraction(object = mnm_pint, int = c(6,15)) 
+ew_6_15 = ew_6_15$edgeweight * ew_6_15$sign
+
+ew_7_15 = showInteraction(object = mnm_pint, int = c(7,15)) 
+ew_7_15 = ew_7_15$edgeweight * ew_7_15$sign
+
+ew_8_12 = showInteraction(object = mnm_pint, int = c(8,12)) 
+ew_8_12 = ew_8_12$edgeweight * ew_8_12$sign
+
+ew_10_16 = showInteraction(object = mnm_pint, int = c(10,16)) 
+ew_10_16 = ew_10_16$edgeweight * ew_10_16$sign
+
+ew_11_16 = showInteraction(object = mnm_pint, int = c(11,16)) 
+ew_11_16 = ew_11_16$edgeweight * ew_11_16$sign
+
+ew_11_17 = showInteraction(object = mnm_pint, int = c(11,17)) 
+ew_11_17 = ew_11_17$edgeweight * ew_11_17$sign
+
+ew_12_17 = showInteraction(object = mnm_pint, int = c(12,17)) 
+ew_12_17 = ew_12_17$edgeweight * ew_12_17$sign
+
+ew_13_17 = showInteraction(object = mnm_pint, int = c(13,17)) 
+ew_13_17 = ew_13_17$edgeweight * ew_13_17$sign
+
+ew_14_15 = showInteraction(object = mnm_pint, int = c(14,15)) 
+ew_14_15 = ew_14_15$edgeweight * ew_14_15$sign
+
+ew_14_18 = showInteraction(object = mnm_pint, int = c(14,18)) 
+ew_14_18 = ew_14_18$edgeweight * ew_14_18$sign
+
+ew_15_19 = showInteraction(object = mnm_pint, int = c(15,19)) 
+ew_15_19 = ew_15_19$edgeweight * ew_15_19$sign
+
+ew_16_19 = showInteraction(object = mnm_pint, int = c(16,19)) 
+ew_16_19 = ew_16_19$edgeweight * ew_16_19$sign
+```
+
+```{r}
+# Store in a df
+# Create an empty dataframe to store the results
+signed_mod_pint <- data.frame(Node1 = integer(), Node2 = integer(), Node3 = integer(), 
+                              SignedWeight = numeric(), EW_SignedWeight = numeric())
+
+# List of edges based on new interactions in mnm_pint
+edges <- list(
+  "edge_1_11", "edge_1_12", "edge_1_18", "edge_2_16", "edge_3_4", "edge_3_8", 
+  "edge_4_8", "edge_4_12", "edge_4_13", "edge_5_14", "edge_5_19", "edge_6_15", 
+  "edge_7_15", "edge_8_12", "edge_10_16", "edge_11_16", "edge_11_17", "edge_12_17",
+  "edge_13_17", "edge_14_15", "edge_14_18", "edge_15_19", "edge_16_19"
+)
+
+# List of corresponding ew_* values for two-way interactions
+ew_edges <- list(
+  "ew_1_11", "ew_1_12", "ew_1_18", "ew_2_16", "ew_3_4", "ew_3_8", 
+  "ew_4_8", "ew_4_12", "ew_4_13", "ew_5_14", "ew_5_19", "ew_6_15", 
+  "ew_7_15", "ew_8_12", "ew_10_16", "ew_11_16", "ew_11_17", "ew_12_17",
+  "ew_13_17", "ew_14_15", "ew_14_18", "ew_15_19", "ew_16_19"
+)
+
+# Corresponding node triples for each interaction
+nodes <- list(
+  c(1, 11, 20), c(1, 12, 20), c(1, 18, 20), c(2, 16, 20), c(3, 4, 20), c(3, 8, 20), 
+  c(4, 8, 20), c(4, 12, 20), c(4, 13, 20), c(5, 14, 20), c(5, 19, 20), c(6, 15, 20), 
+  c(7, 15, 20), c(8, 12, 20), c(10, 16, 20), c(11, 16, 20), c(11, 17, 20), c(12, 17, 20),
+  c(13, 17, 20), c(14, 15, 20), c(14, 18, 20), c(15, 19, 20), c(16, 19, 20)
+)
+
+# Loop through each edge and append it to the dataframe
+for (i in seq_along(edges)) {
+  # Get the signed weight from the edge and ew objects
+  signed_weight <- get(edges[[i]])
+  ew_signed_weight <- get(ew_edges[[i]])
+  
+  # Append to the dataframe
+  signed_mod_pint <- rbind(signed_mod_pint, 
+                           data.frame(Node1 = nodes[[i]][1], 
+                                      Node2 = nodes[[i]][2], 
+                                      Node3 = nodes[[i]][3], 
+                                      SignedWeight = signed_weight,
+                                      EW_SignedWeight = ew_signed_weight))
+}
+
+# Recode Node1 and Node2 based on shortnames
+signed_mod_pint <- signed_mod_pint %>%
+  mutate(Node1 = shortnames[Node1],  # Recode Node1 based on shortnames
+         Node2 = shortnames[Node2])
+
+#clean 
+signed_mod_pint <- signed_mod_pint %>%
+  select(-Node3)
+
+# Step 2: Create the predicted0 column (EW_SignedWeight + (SignedWeight * 0))
+signed_mod_pint <- signed_mod_pint %>%
+  mutate(predicted0 = EW_SignedWeight + (SignedWeight * 0))
+
+# Step 3: Create the predicted1 column (EW_SignedWeight + (SignedWeight * 1))
+signed_mod_pint <- signed_mod_pint %>%
+  mutate(predicted1 = EW_SignedWeight + (SignedWeight * 1))
+
+# melt cols
+signed_mod_pint <- signed_mod_pint %>%
+  mutate(Node = paste(Node1, Node2, sep = "-"))
+
+```
+
+
+##### Final plot
+
+```{r}
+# Data manag
+
+# Add a 'moderator' column to each dataframe
+signed_mod_pint <- signed_mod_pint %>%
+  mutate(moderator = "pint")
+
+signed_mod_educ <- signed_mod_educ %>%
+  mutate(moderator = "educ")
+
+
+# Select the required columns (Node, predicted0, predicted1, moderator)
+signed_mod_pint <- signed_mod_pint %>%
+  select(Node, predicted0, predicted1, moderator)
+
+signed_mod_educ <- signed_mod_educ %>%
+  select(Node, predicted0, predicted1, moderator)
+
+
+# Combine the 2 dataframes into one
+mod_merged <- bind_rows(signed_mod_pint, signed_mod_educ)%>%
+  mutate(abs_diff = abs(predicted0) - abs(predicted1))
+
+```
+
+```{r}
+# Plot the graph with facet wrap by moderator
+plot_mod_merged <- ggplot(mod_merged) +
+  # Plot predicted0 with color #966FD6B3
+  geom_point(aes(x = Node, y = predicted0, color = "Low group"), size = 3) +
+  
+  # Plot predicted1 with color #008B8BB3
+  geom_point(aes(x = Node, y = predicted1, color = "High group"), size = 3) +
+  
+  # Segment lines between the two points (predicted0 and predicted1)
+  geom_segment(aes(x = Node, xend = Node, y = predicted0, yend = predicted1), color = "grey") +
+  
+  # Add a reference line at y = 0
+  geom_hline(yintercept = 0, color = "black", linetype = "dashed") +  # Add reference line
+  
+  coord_flip() +  # Flip the axes
+  
+  # Customize the color scale
+  scale_color_manual(values = c("Low group" = "#966FD6B3", "High group" = "#008B8BB3")) +
+  
+  # Facet by moderator
+  facet_wrap(~ moderator, scales = "free_y") +  # Ensure facets by moderator
+  
+  # Apply the theme
+  theme_ipsum() +
+  theme(
+    legend.position = "bottom",  # Move legend to the bottom
+    axis.title.y = element_text(size = 14, face = "bold"),
+    plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),  # Adjust title size
+    legend.title = element_text(size = 12, face = "bold")
+  ) +
+  
+  # Add labels and title
+  xlab("") +
+  ylab("Signed Weight") +
+  ggtitle("Predicted Signed Weights for Interactions by Moderator")
+
+# Display the plot
+print(plot_mod_merged)
+
+# Save the plot
+ggsave(here("Output", "Supplement", "Moderation_coeff_full.jpg"), plot_mod_merged, width = 12, height = 12, dpi = 300)
+
+```
+
+
+# Descriptives
+This code replicates descriptives of the networks used throughout the article
+
+```{r}
+#Figure 1 (2 in the article)
+
+## cor net
+
+# Remove diagonal elements (self-loops) if necessary
+att_net_no_diag = att_net
+diag(att_net_no_diag) <- NA
+
+## Min edge weight (excluding diagonal elements)
+min_fig1 = att_net_no_diag %>% 
+  as.vector() %>%
+  min(na.rm = TRUE)
+
+## Max edge weight (excluding diagonal elements and edge weight of 1)
+max_fig1 = att_net_no_diag %>% 
+  as.vector()
+max_fig1 = max_fig1[!is.na(max_fig1) & max_fig1 != 1]
+max_fig1 = max(max_fig1, na.rm = TRUE)
+
+## Node strength (using the original matrix if diagonals are meaningful)
+strength_fig1 = centrality(att_net)
+min_st_fig1 = min(strength_fig1$OutDegree)
+max_st_fig1 = max(strength_fig1$OutDegree)
+
+## Constraint (using the full matrix)
+const_fig1 = mean(abs(att_net), na.rm = TRUE)
+
+## Number of non-zero edges (ignoring diagonal elements if necessary)
+nonzerofig1 = sum(att_net_no_diag != 0, na.rm = TRUE)
+
+# Count edges lower than 0.001
+entries_below_001 = sum(att_net_no_diag < 0.001, na.rm = TRUE)
+```
+
+```{r}
+# Figure 1 right panel (2 in the artilce)
+
+## mgm
+
+#signed matrix
+mat_mgm_att = mgm_att$pairwise$wadj*mgm_att$pairwise$signs
+
+# Remove diagonal elements (self-loops) if necessary
+mat_mgm_att_no_diag = mat_mgm_att
+diag(mat_mgm_att_no_diag) <- NA
+
+## Min edge weight (excluding diagonal elements)
+min_fig1 = mat_mgm_att_no_diag %>% 
+  as.vector() %>%
+  min(na.rm = TRUE)
+
+## Max edge weight (excluding diagonal elements and edge weight of 1)
+max_fig1 = mat_mgm_att_no_diag %>% 
+  as.vector()
+max_fig1 = max_fig1[!is.na(max_fig1) & max_fig1 != 1]
+max_fig1 = max(max_fig1, na.rm = TRUE)
+
+## Node strength (using the original matrix if diagonals are meaningful)
+strength_fig1 = centrality(mgm_att$pairwise$wadj)
+
+## Constraint (using the full matrix)
+const_fig1 = mean(abs(mgm_att$pairwise$wadj[!is.na(mgm_att$pairwise$wadj) & mgm_att$pairwise$wadj != 0]))
+
+## Number of non-zero edges (ignoring diagonal elements if necessary)
+zerofig1 = (sum(is.na(mgm_att$pairwise$signs)) - 19) / 2
+
+# Count edges lower than 0.001
+entries_no0 = sum(mgm_att$pairwise$wadj != 0, na.rm = TRUE)
+```
+
+
+```{r}
+# Figure 2 (3 in the article)
+
+# Function to calculate and print the mean and bootstrapped CIs
+print_summary_stats <- function(df_l, df_m = NULL, df_h, df_l_pc, df_m_pc = NULL, df_h_pc) {
+  if (!is.null(df_m)) {
+    pint <- c(rep("Low", 10000), rep("Medium", 10000), rep("High", 10000))
+    const_val <- c(df_l, df_m, df_h, df_l_pc, df_m_pc, df_h_pc)
+    data_type <- rep(c("Correlational network", "mgm"), each = 30000)
+    pint_vector <- rep(pint, 2)
+  } else {
+    pint <- c(rep("Low", 10000), rep("High", 10000))
+    const_val <- c(df_l, df_h, df_l_pc, df_h_pc)
+    data_type <- rep(c("Correlational network", "mgm"), each = 20000)
+    pint_vector <- rep(pint, 2)
+  }
+  
+  mcon_data <- data.frame(
+    const_val = const_val,
+    pint = pint_vector,
+    data_type = data_type
+  )
+  
+  # Calculate summary statistics
+  mcon_data_summary <- mcon_data %>%
+    group_by(pint, data_type) %>%
+    summarise(
+      mean_val = mean(const_val),
+      ci_lower = quantile(const_val, 0.025),
+      ci_upper = quantile(const_val, 0.975)
+    )
+  
+  # Print the summary
+  print(mcon_data_summary)
+}
+
+# print desc
+print_summary_stats(cons_pint_l, cons_pint_m, cons_pint_h, cons_pint_l_pc, cons_pint_m_pc, cons_pint_h_pc)
+
+# for two levels df:
+print_descriptives <- function(cons_pint_h_2_2, cons_pint_h_2_2_pc, cons_pint_l_2_2, cons_pint_l_2_2_pc) {
+  # Combine the data
+  cons_data <- data.frame(
+    const_val = c(cons_pint_h_2_2, cons_pint_h_2_2_pc, cons_pint_l_2_2, cons_pint_l_2_2_pc),
+    group = rep(c("cons_pint_h_2_2", "cons_pint_h_2_2_pc", "cons_pint_l_2_2", "cons_pint_l_2_2_pc"), 
+                each = length(cons_pint_h_2_2))
+  )
+  
+  # Calculate summary statistics
+  cons_data_summary <- cons_data %>%
+    group_by(group) %>%
+    summarise(
+      mean_val = mean(const_val),
+      sd_val = sd(const_val),
+      min_val = min(const_val),
+      max_val = max(const_val),
+      ci_lower = quantile(const_val, 0.025),
+      ci_upper = quantile(const_val, 0.975)
+    )
+  
+  # Print the summary
+  print(cons_data_summary)
+}
+
+# Example usage (assuming cons_pint_h_2_2, cons_pint_h_2_2_pc, cons_pint_l_2_2, and cons_pint_l_2_2_pc are defined)
+print_descriptives(cons_pint_h_2_2, cons_pint_h_2_2_pc, cons_pint_l_2_2, cons_pint_l_2_2_pc)
+
+```
+
+```{r}
+# Figure 3 (4 in the article): ASPL
+# Function to print descriptive statistics for ASPL values
+print_aspl_descriptives <- function(aspl_data) {
+  aspl_values <- aspl_data$aspl_values
+  
+  # Calculate the mean, standard deviation, quartiles, and bootstrapped confidence intervals
+  mean_val <- mean(aspl_values, na.rm = TRUE)
+  sd_val <- sd(aspl_values, na.rm = TRUE)
+  quartiles <- quantile(aspl_values, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
+  ci_lower <- quantile(aspl_values, 0.025, na.rm = TRUE)
+  ci_upper <- quantile(aspl_values, 0.975, na.rm = TRUE)
+  
+  # Print the results
+  cat("Descriptive Statistics for ASPL:\n")
+  cat("Mean:", mean_val, "\n")
+  cat("Standard Deviation:", sd_val, "\n")
+  cat("25th Percentile (Q1):", quartiles[1], "\n")
+  cat("50th Percentile (Median):", quartiles[2], "\n")
+  cat("75th Percentile (Q3):", quartiles[3], "\n")
+  cat("Lower 95% CI:", ci_lower, "\n")
+  cat("Upper 95% CI:", ci_upper, "\n")
+}
+
+# print desc
+print_aspl_descriptives(aspl_pint_l_2_2_pc)
+print_aspl_descriptives(aspl_pint_h_2_2_pc)
+print_aspl_descriptives(aspl_educ_l_pc)
+print_aspl_descriptives(aspl_educ_h_pc)
+
+```
+
+```{r}
+# Figure 3 (4 in the article): R2 sums
+# Function to print descriptive statistics for R² values
+print_r2_descriptives <- function(r2_data) {
+  r2_values <- r2_data$r2_values
+  
+  # Calculate the mean, standard deviation, quartiles, and bootstrapped confidence intervals
+  mean_val <- mean(r2_values, na.rm = TRUE)
+  sd_val <- sd(r2_values, na.rm = TRUE)
+  quartiles <- quantile(r2_values, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
+  ci_lower <- quantile(r2_values, 0.025, na.rm = TRUE)
+  ci_upper <- quantile(r2_values, 0.975, na.rm = TRUE)
+  
+  # Print the results
+  cat("Descriptive Statistics for R²:\n")
+  cat("Mean:", mean_val, "\n")
+  cat("Standard Deviation:", sd_val, "\n")
+  cat("25th Percentile (Q1):", quartiles[1], "\n")
+  cat("50th Percentile (Median):", quartiles[2], "\n")
+  cat("75th Percentile (Q3):", quartiles[3], "\n")
+  cat("Lower 95% CI:", ci_lower, "\n")
+  cat("Upper 95% CI:", ci_upper, "\n")
+}
+
+# Example usage with your R² objects
+print_r2_descriptives(r2_pint_l_2_1_pc)
+print_r2_descriptives(r2_pint_h_2_1_pc)
+print_r2_descriptives(r2_educ_l_pc)
+print_r2_descriptives(r2_educ_h_pc)
+```
+
+```{r}
+#Figure 4
+
+#signed mat
+mat_signed_left = cond0$pairwise$wadj*cond0$pairwise$signs
+mat_signed_M5S = cond1$pairwise$wadj*cond1$pairwise$signs
+mat_signed_right = cond2$pairwise$wadj*cond2$pairwise$signs
+
+# col names
+rownames(mat_signed_left) <- shortnames
+colnames(mat_signed_left) <- shortnames
+
+rownames(mat_signed_M5S) <- shortnames
+colnames(mat_signed_M5S) <- shortnames
+
+rownames(mat_signed_right) <- shortnames
+colnames(mat_signed_right) <- shortnames
+
+# remove moderator
+mat_signed_left <- mat_signed_left[-20, -20]
+mat_signed_M5S <- mat_signed_M5S[-20, -20]
+mat_signed_right <- mat_signed_right[-20, -20]
+
+#na as 0
+replace_na_with_zero <- function(mat) {
+  df <- as.data.frame(mat)  # Convert matrix to data frame
+  df <- df %>% 
+    mutate_all(~replace(., is.na(.), 0))  # Replace NA with 0
+  as.matrix(df)  # Convert back to matrix
+}
+
+# Apply the function to each matrix
+mat_left <- replace_na_with_zero(mat_signed_left)
+mat_M5S <- replace_na_with_zero(mat_signed_M5S)
+mat_right <- replace_na_with_zero(mat_signed_right)
+
+# average between matrices cors
+average_correlation <- function(mat1, mat2) {
+  cor_matrix <- cor(mat1, mat2)
+  mean_cor <- mean(cor_matrix, na.rm = TRUE)  # Compute the mean, ignore NA values
+  return(mean_cor)
+}
+
+cor_left_M5S <- average_correlation(mat_left, mat_M5S)
+cor_left_right <- average_correlation(mat_left, mat_right)
+cor_M5S_right <- average_correlation(mat_M5S, mat_right)
+
+
+# isolate biggest differences
+
+# Function to get a list of all differences and associated row/col names
+get_all_differences <- function(diff_matrix, row_names, col_names, comparison_label) {
+  # Flatten the matrix to get each difference
+  diff_values <- as.vector(diff_matrix)
+  
+  # Get row and column indices of each element
+  row_indices <- row(diff_matrix)
+  col_indices <- col(diff_matrix)
+  
+  # Create a dataframe of all differences
+  all_differences <- data.frame(
+    Row_Name = row_names[row_indices],
+    Column_Name = col_names[col_indices],
+    Difference = diff_values,
+    Comparison = comparison_label
+  )
+  
+  return(all_differences)
+}
+
+# Calculate differences for each pair of matrices
+diff_left_M5S <- abs(mat_left - mat_M5S)
+diff_left_right <- abs(mat_left - mat_right)
+diff_M5S_right <- abs(mat_M5S - mat_right)
+
+# Get row and column names (assuming matrices have them)
+row_names <- rownames(mat_left)  # Assuming row names are the same for all matrices
+col_names <- colnames(mat_left)  # Assuming column names are the same for all matrices
+
+# Get all differences for each comparison
+diffs_left_M5S <- get_all_differences(diff_left_M5S, row_names, col_names, "mat_left vs. mat_M5S")
+diffs_left_right <- get_all_differences(diff_left_right, row_names, col_names, "mat_left vs. mat_right")
+diffs_M5S_right <- get_all_differences(diff_M5S_right, row_names, col_names, "mat_M5S vs. mat_right")
+
+# Combine all differences into one dataframe
+all_differences <- rbind(diffs_left_M5S, diffs_left_right, diffs_M5S_right)
+
+# Sort the dataframe by the difference values in descending order if desired
+all_differences <- all_differences[base::order(-all_differences$Difference), ]
+
+# Print the full list of differences
+print(all_differences)
+
+
+# extract top 5 
+
+# Create a dataframe containing the top 5 rows for each comparison group
+top_differences_grouped <- all_differences %>%
+  group_by(Comparison) %>%
+  top_n(10, wt = Difference) %>%
+  arrange(Comparison, desc(Difference)) %>%
+  ungroup()
+
+# Now create separate dataframes for each comparison
+
+# Top 5 for mat_left vs. mat_M5S
+top_diffs_left_M5S <- top_differences_grouped %>%
+  filter(Comparison == "mat_left vs. mat_M5S")
+
+# Top 5 for mat_left vs. mat_right
+top_diffs_left_right <- top_differences_grouped %>%
+  filter(Comparison == "mat_left vs. mat_right")
+
+# Top 5 for mat_M5S vs. mat_right
+top_diffs_M5S_right <- top_differences_grouped %>%
+  filter(Comparison == "mat_M5S vs. mat_right")
+
+# View the dataframes
+print(top_diffs_left_M5S)
+print(top_diffs_left_right)
+print(top_diffs_M5S_right)
+```
+

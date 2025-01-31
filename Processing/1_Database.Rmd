@@ -11,7 +11,10 @@ output: html_document
 #packages
 library("pacman")
 p_load(tidyverse, here, sjlabelled, stringr, glue, janitor, haven, stargazer, 
-       ltm, skimr, readxl, naniar)
+       ltm, skimr, readxl, naniar, mgm, conflicted)
+
+
+conflicts_prefer(haven::zap_labels)
 
 #remove scientific notation
 options(scipen=999)
@@ -198,8 +201,117 @@ educ_high = IPBS_educ[[1]] #high: 443
 #stargazer(as.data.frame(educ_high), type = "text", nobs = TRUE)
 ```
 
+## Boot data for r2 of mgm
+
+```{r}
+# List of matrices to bootstrap
+matrices <- list(
+  "polint_2_2_l" = polint_2_2_l,
+  "polint_2_2_h" = polint_2_2_h,
+  "educ_low" = educ_low,
+  "educ_high" = educ_high
+)
+
+# Number of bootstrap samples
+n_boot <- 1000
+
+# Function to bootstrap a matrix
+bootstrap_matrix <- function(mat, n_boot) {
+  lapply(1:n_boot, function(i) {
+    sample_indices <- sample(1:nrow(mat), replace = TRUE)  # Sample rows with replacement
+    as.matrix(mat[sample_indices, , drop = FALSE])  # Convert to matrix
+  })
+}
+
+# Loop through matrices and generate bootstrap samples
+boot_samples <- list()
+
+for (name in names(matrices)) {
+  cat("Bootstrapping:", name, "\n")
+  boot_samples[[name]] <- bootstrap_matrix(matrices[[name]], n_boot)
+}
+
+
+```
+
+```{r}
+# Check if each dataset contains 1000 bootstrapped matrices
+sapply(boot_samples, length)  # Should return 1000 for each element
+
+# Check if each bootstrap sample is a matrix and has the expected dimensions
+for (name in names(boot_samples)) {
+  cat("\nChecking dataset:", name, "\n")
+  cat("Number of bootstrap samples:", length(boot_samples[[name]]), "\n")
+  
+  # Check structure of the first bootstrapped matrix
+  if (length(boot_samples[[name]]) > 0) {
+    sample_matrix <- boot_samples[[name]][[1]]
+    cat("Matrix dimensions:", dim(sample_matrix), "\n")
+    
+    # Check if it's a matrix
+    if (!is.matrix(sample_matrix)) {
+      cat("Warning: Bootstrapped sample is not a matrix for", name, "\n")
+    }
+  }
+}
+```
+
+
+```{r}
+# Set full bootstrap iterations
+n_boot <- 1000  
+
+# Function to apply mgm and extract node-wise R²
+apply_mgm_bootstrap <- function(boot_matrices) {
+  
+  # Get number of nodes (columns)
+  n_nodes <- ncol(boot_matrices[[1]])  
+
+  # Initialize matrix to store R² values (each row = one bootstrap iteration)
+  r2_matrix <- matrix(NA, nrow = n_boot, ncol = n_nodes)
+
+  for (i in seq_len(n_boot)) {
+    cat("Processing iteration:", i, "of", n_boot, "\n")
+    
+    # Convert to matrix and zap labels
+    data_mat <- as.matrix(zap_labels(boot_matrices[[i]]))
+
+    # Fit mgm model
+    mgm_model <- mgm(
+      data = data_mat, 
+      type = rep("g", n_nodes),  # Gaussian variables
+      level = rep(1, n_nodes), 
+      lambdaSel = "EBIC", 
+      ruleReg = "OR"
+    )
+
+    # Predictability (R² values)
+    pred <- predict(object = mgm_model, data = data_mat, errorCon = 'R2')
+
+    # Extract only the R² values from the errors data frame
+    r2_values <- pred$errors$R2  
+
+    # Store node-wise R² values in matrix
+    r2_matrix[i, ] <- r2_values
+  }
+
+  return(r2_matrix)  # Return matrix with R² values
+}
+
+# Initialize a list to store R² results for each dataset
+r2_results <- list()
+
+# Apply mgm to the full 1K bootstraps in each dataset
+for (name in names(boot_samples)) {
+  cat("\nProcessing full dataset:", name, "\n")
+  r2_results[[name]] <- apply_mgm_bootstrap(boot_samples[[name]])
+}
+
+```
+
 
 # Output
+
 ```{r}
 #Save IPBS
 saveRDS(IPBS, here("Input", "IPBS.rds"))
@@ -223,5 +335,8 @@ save(polint_2_2_l,polint_2_2_h,
 #Save educ partitions
 save(educ_low,educ_high, 
      file = here("Input", "Partitions", "educ_partitions.RData"))
+
+# Save boot R2 data
+save(r2_results, file = here("Input", "Boots", "R2_boot_results.RData"))
 ```
 
