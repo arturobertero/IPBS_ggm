@@ -27,6 +27,7 @@ conflicts_prefer(sna::degree)
 conflicts_prefer(sna::closeness)
 conflicts_prefer(sna::betweenness)
 conflicts_prefer(psych::logit)
+conflicts_prefer(dplyr::desc)
 
 ```
 
@@ -53,10 +54,8 @@ fast_running = 1
 
 # Processing
 
-##  Cor network estimation 
-
 ```{r}
-# Define shortnames, longnames, and groupings as per your original code
+# Define shortnames, longnames, and groupings 
 shortnames <- names(att)
 longnames <- c("Left right","Propensity to vote for PD",
                "Propensity to vote for FI","Propensity to vote for L",
@@ -72,137 +71,13 @@ Totalgroup_comm <- list(
 )
 
 Totalgroup_cols <- c("#966FD6B3","#008B8BB3")  
-```
-
-```{r}
-# estimation on att
 
 #remove labels
 att = sapply(att, haven::zap_labels)
-
-#declare operational or symbolic
-nature = c(rep("Symbolic", 6),
-            rep("Operational", 13))
-
-#Fit cor network 
-att_net = cor_auto(att, npn.SKEPTIC = T, #Nonparanormal transformation (HUGE)
-                        ordinalLevelMax = 7, #from keskinturk
-                        forcePD = TRUE,
-                        missing = "pairwise",
-                        verbose = FALSE)
-
-#square the matrix
-att_net = abs(att_net)
-
-#plot
-qgraph(att_net,
-         fade = TRUE, layout = "spring", theme = "colorblind",  
-         labels = shortnames, nodeNames = longnames,
-         vsize = 7.0, label.cex = 1.1, esize = 15, vTrans = 255,
-         groups = Totalgroup_comm, color = Totalgroup_cols,
-         legend = F, legend.cex = 0.40, title = "Correlational network",
-         filetype = "jpg", filename = here("Output", "Supplement", "att"))
-```
-
-```{r}
-# Function to ensure input data is in matrix/data frame format
-prepare_data <- function(data) {
-  if (is.list(data)) {
-    return(as.data.frame(do.call(cbind, data)))  # Convert list to data frame
-  } else if (is.vector(data)) {
-    return(as.data.frame(matrix(data, nrow = length(data))))  # Convert vector to a data frame
-  } else {
-    return(as.data.frame(data))  # Already in correct format
-  }
-}
-
-# Function to fit and plot correlation networks and save the plots to a file
-generate_network_plots <- function(low_data, high_data, shortnames, longnames, group_names, group_colors, title_low, title_high, file_base) {
-  # Remove labels
-  low_data <- sapply(low_data, haven::zap_labels)
-  high_data <- sapply(high_data, haven::zap_labels)
-  
-  # Fit GGM for low data
-  low_data_net <- cor_auto(low_data, npn.SKEPTIC = TRUE, ordinalLevelMax = 7, forcePD = TRUE, missing = "pairwise", verbose = FALSE)
-  low_data_net <- abs(low_data_net)  # Square the matrix
-  
-  # Fit GGM for high data
-  high_data_net <- cor_auto(high_data, npn.SKEPTIC = TRUE, ordinalLevelMax = 7, forcePD = TRUE, missing = "pairwise", verbose = FALSE)
-  high_data_net <- abs(high_data_net)  # Square the matrix
-  
-  # Save plot for low data
-  set.seed(1)
-  qgraph(low_data_net,
-         fade = TRUE, layout = "spring", theme = "colorblind",  
-         labels = shortnames, nodeNames = longnames,
-         vsize = 7.0, label.cex = 1.1, esize = 15, vTrans = 255,
-         groups = group_names, color = group_colors,
-         legend = F, legend.cex = 0.40, title = title_low,
-         filetype = "jpg", filename = here("Output", "Supplement", paste0(file_base, "_Low")))
-  
-  # Save plot for high data
-  set.seed(1)
-  qgraph(high_data_net,
-         fade = TRUE, layout = "spring", theme = "colorblind",  
-         labels = shortnames, nodeNames = longnames,
-         vsize = 7.0, label.cex = 1.1, esize = 15, vTrans = 255,
-         groups = group_names, color = group_colors,
-         legend = F, legend.cex = 0.40, title = title_high,
-         filetype = "jpg", filename = here("Output", "Supplement", paste0(file_base, "_High")))
-}
-
-# Generate Political Interest plots and save them
-generate_network_plots(
-  low_data = prepare_data(polint_2_1_l),
-  high_data = prepare_data(polint_2_1_h),
-  shortnames = shortnames, 
-  longnames = longnames,
-  group_names = Totalgroup_comm, 
-  group_colors = Totalgroup_cols, 
-  title_low = "Political Interest - Low",
-  title_high = "Political Interest - High",
-  file_base = "Fig_Political_Interest"
-)
-
-# Generate Education plots and save them
-generate_network_plots(
-  low_data = prepare_data(educ_low),
-  high_data = prepare_data(educ_high),
-  shortnames = shortnames, 
-  longnames = longnames,
-  group_names = Totalgroup_comm, 
-  group_colors = Totalgroup_cols, 
-  title_low = "Education - Low",
-  title_high = "Education - High",
-  file_base = "Fig_Education"
-)
-
 ```
 
 
 ## MGMs
-
-```{r}
-# mgm on att
-  mgm_att <- mgm(att, type = rep("g", length(shortnames)), 
-                   level = rep(1, length(shortnames)), lambdaSel = "EBIC", ruleReg = "OR")
-  
-  # Predictability
-  pred_att <- predict(object = mgm_att, data = att, errorCon = 'R2')
-  
-  # Plot the MGM network
-  graph_mgm <- qgraph(mgm_att$pairwise$wadj, layout = 'spring',
-                      labels = shortnames, nodeNames = longnames,  
-                      groups = Totalgroup_comm, color = Totalgroup_cols, 
-                      legend = F, legend.cex = 0.33, title = "mgm",
-                      edge.color = mgm_att$pairwise$edgecolor_cb, vTrans = 255,
-                      borders = T, vsize = 7.0, esize = 15, GLratio = 2,
-                      pie = pred_att$errors[,2], pieColor = rep('#FFFF00', length(shortnames)),
-                      filetype = "jpg",  
-                      filename = here("Output", "Supplement", "att_mgm"))
-
-```
-
 
 ```{r}
 datasets <- list(
@@ -297,7 +172,7 @@ row2 <- image_append(c(img3, img4), stack = FALSE)  # Second row (horizontal)
 combined_img <- image_append(c(row1, row2), stack = TRUE)  # Stack rows vertically
 
 # Save the final combined image
-image_write(combined_img, path = here("Output", "Article", "Figure_2.jpg"), quality = 100)
+image_write(combined_img, path = here("Output", "Article", "Figure_1.jpg"), quality = 100)
 
 ```
 
@@ -453,20 +328,10 @@ cons_educ_h_pc <- process_boots_data_pc(df.boot_educ_h_pc)
 
 ## H1 and H2 
 
-### Multiplot networks att
-
-```{r}
-# Figure_1 (cor vs mgm)
-img1 <- image_read(here("Output", "Supplement", "att.jpg"))
-img2 <- image_read(here("Output", "Supplement", "att_mgm.jpg"))
-combined_img <- image_append(c(img1, img2), stack = FALSE)
-image_write(combined_img, path = here("Output", "Article", "Figure_1.jpg"))
-
-```
 
 ### Constraint
 
-#### Mann-Whitney U Test
+#### Mann-Whitney U Test 
 
 ```{r}
 # Assumptions
@@ -877,10 +742,12 @@ create_facet_plot <- function(data) {
 facet_r2_plot <- create_facet_plot(plot_data)
 
 # Save
-ggsave(here("Output", "Article", "Figure_3.jpg"), facet_r2_plot, , width = 12, height = 12, dpi = 300)
+ggsave(here("Output", "Article", "Figure_2.jpg"), facet_r2_plot, , width = 12, height = 12, dpi = 300)
 ```
 
-## Table 2 and assumptions
+## Tables
+
+### Table 2 
 
 ```{r}
 # Function to extract statistics from the test results
@@ -919,7 +786,95 @@ summary_flextable <- summary_table %>%
   align(align = "center", part = "all")  # Center align all values
 
 # Save the table as a Word document
-save_as_docx(summary_flextable, path = here("Output", "Article", "Mann_Whitney_Results.docx"))
+save_as_docx(summary_flextable, path = here("Output", "Article", "Table_2.docx"))
+```
+
+### Table 2 with pint_2_1
+
+```{r}
+# Run tests for Political Interest and Education (constraint)
+mw_pint <- run_mann_whitney_effects(cons_pint_l_2_1_pc, cons_pint_h_2_1_pc, "Political Interest")
+mw_educ <- run_mann_whitney_effects(cons_educ_l_pc, cons_educ_h_pc, "Education")
+
+# ASPL 
+mw_aspl_pint <- run_mann_whitney_effects_aspl(aspl_results$aspl_pint_l, aspl_results$aspl_pint_h, "ASPL - Political Interest")
+mw_aspl_educ <- run_mann_whitney_effects_aspl(aspl_results$aspl_educ_l, aspl_results$aspl_educ_h, "ASPL - Education")
+
+# R² 
+mw_r2_pint <- run_mann_whitney_effects(r2_pint_l, r2_pint_h, "R² - Political Interest")
+mw_r2_educ <- run_mann_whitney_effects(r2_educ_l, r2_educ_h, "R² - Education")
+
+# Create a summary table
+summary_table_2 <- bind_rows(
+  extract_test_results(mw_pint, "Mean Constraint - Political Interest"),
+  extract_test_results(mw_educ, "Mean Constraint - Education"),
+  extract_test_results(mw_aspl_pint, "ASPL - Political Interest"),
+  extract_test_results(mw_aspl_educ, "ASPL - Education"),
+  extract_test_results(mw_r2_pint, "R² - Political Interest"),
+  extract_test_results(mw_r2_educ, "R² - Education")
+) %>%
+  mutate(across(W_statistic:CLES, ~ round(.x, 3)))
+
+# Create a formatted flextable
+summary_flextable_2 <- summary_table_2 %>%
+  flextable() %>%
+  theme_booktabs() %>%  # Clean professional look
+  autofit() %>%  # Adjust column widths
+  set_caption("Mann-Whitney U Test Results Summary") %>%
+  colformat_num(j = c("W_statistic", "p_value", "Cliff_Delta", "CI_Lower", "CI_Upper", "Rank_Biserial", "CLES"), digits = 3) %>%  # Ensure 3 decimal places
+  bold(j = "Comparison") %>%  # Make comparison names bold
+  align(align = "center", part = "all")  # Center align all values
+
+# Save the table as a Word document
+save_as_docx(summary_flextable, path = here("Output", "Supplement", "H1_H2_tests.docx"))
+```
+
+### Assumptions for H1 and H2
+
+```{r}
+# Create a data frame summarizing test results
+summary_assumption_tests <- data.frame(
+  Test = c(
+    "Shapiro-Wilk (Constraint - Political Interest Low)", "Shapiro-Wilk (Constraint - Political Interest High)",
+    "Levene’s Test (Constraint - Education)", "Shapiro-Wilk (Constraint - Education Low)", "Shapiro-Wilk (Constraint - Education High)",
+    
+    "Levene’s Test (ASPL - Political Interest)", "Shapiro-Wilk (ASPL - Political Interest Low)", "Shapiro-Wilk (ASPL - Political Interest High)",
+    "Levene’s Test (ASPL - Education)", "Shapiro-Wilk (ASPL - Education Low)", "Shapiro-Wilk (ASPL - Education High)",
+
+    "Levene’s Test (R² - Political Interest)", "Shapiro-Wilk (R² - Political Interest Low)", "Shapiro-Wilk (R² - Political Interest High)",
+    "Levene’s Test (R² - Education)", "Shapiro-Wilk (R² - Education Low)", "Shapiro-Wilk (R² - Education High)"
+  ),
+  W_Statistic = c(
+    0.99357, 0.99604, NA, 0.99337, 0.99644, 
+    NA, 0.99678, 0.99911, NA, 0.9956, 0.99941, 
+    NA, 0.88832, 0.94487, NA, 0.91297, 0.88072
+  ),
+  F_Statistic = c(
+    NA, NA, 230.82, NA, NA, 
+    1322.1, NA, NA, 36.851, NA, NA, 
+    33.203, NA, NA, 0.7554, NA, NA
+  ),
+  P_Value = c(
+    3.269e-14, 2.367e-10, 2.2e-16, 1.726e-14, 1.382e-09, 
+    2.2e-16, 6.695e-09, 0.01011, 1.298e-09, 3.991e-08, 0.1079, 
+    8.366e-09, 2.2e-16, 2.2e-16, 0.3848, 2.2e-16, 2.2e-16
+  )
+)
+
+# Create a formatted flextable
+summary_flextable_assumptions <- summary_assumption_tests %>%
+  flextable() %>%
+  theme_booktabs() %>%  # Clean professional look
+  autofit() %>%  # Adjust column widths
+  set_caption("Shapiro-Wilk Normality and Levene's Test Results") %>%
+  colformat_num(j = c("W_Statistic", "F_Statistic", "P_Value"), digits = 3) %>%  # Ensure 3 decimal places
+  bold(j = "Test") %>%  # Make test names bold
+  align(align = "center", part = "all")  # Center align all values
+
+# Save the table as a Word document
+save_as_docx(summary_flextable_assumptions, path = here("Output", "Supplement", "Assumption_Tests.docx"))
+
+
 ```
 
 
@@ -1007,7 +962,7 @@ Graph_cond_1 <- qgraph(cond1$pairwise$wadj)
 Graph_cond_2 <- qgraph(cond2$pairwise$wadj)
 
 # Multiplot for Left and Right only
-jpeg(here("Output", "Article", "Figure_4.jpg"), 
+jpeg(here("Output", "Article", "Figure_3.jpg"), 
      height = 8000, width = 8000, quality = 1000)  # Adjust image size as needed
 
 # Create a common layout based on the two conditions
@@ -1481,208 +1436,188 @@ ggsave(here("Output", "Supplement", "Moderation_coeff_full.jpg"), plot_mod_merge
 This code replicates descriptives of the networks used throughout the article
 
 ```{r}
-#Figure 1 (2 in the article)
+# Figure 2
 
-## cor net
+## Constraint
+compute_mean_constraint <- function(adj_matrix) {
+  abs_matrix <- abs(adj_matrix)  # Take absolute values of all edges
+  non_zero_edges <- abs_matrix[abs_matrix != 0]  # Extract non-zero absolute values
+  return(mean(non_zero_edges))  # Compute mean
+}
 
-# Remove diagonal elements (self-loops) if necessary
-att_net_no_diag = att_net
-diag(att_net_no_diag) <- NA
+# Compute for each network
+mean_constraint_pint_low <- compute_mean_constraint(mgm_models[["pol_int_low"]][["pairwise"]][["wadj"]])
+mean_constraint_pint_high <- compute_mean_constraint(mgm_models[["pol_int_high"]][["pairwise"]][["wadj"]])
+mean_constraint_educ_low <- compute_mean_constraint(mgm_models[["educ_low"]][["pairwise"]][["wadj"]])
+mean_constraint_educ_high <- compute_mean_constraint(mgm_models[["educ_high"]][["pairwise"]][["wadj"]])
 
-## Min edge weight (excluding diagonal elements)
-min_fig1 = att_net_no_diag %>% 
-  as.vector() %>%
-  min(na.rm = TRUE)
+# Print results
+mean_constraint_values <- data.frame(
+  Network = c("Political Interest - Low", "Political Interest - High", "Education - Low", "Education - High"),
+  Mean_Constraint = c(mean_constraint_pint_low, mean_constraint_pint_high, mean_constraint_educ_low, mean_constraint_educ_high)
+)
 
-## Max edge weight (excluding diagonal elements and edge weight of 1)
-max_fig1 = att_net_no_diag %>% 
-  as.vector()
-max_fig1 = max_fig1[!is.na(max_fig1) & max_fig1 != 1]
-max_fig1 = max(max_fig1, na.rm = TRUE)
-
-## Node strength (using the original matrix if diagonals are meaningful)
-strength_fig1 = centrality(att_net)
-min_st_fig1 = min(strength_fig1$OutDegree)
-max_st_fig1 = max(strength_fig1$OutDegree)
-
-## Constraint (using the full matrix)
-const_fig1 = mean(abs(att_net), na.rm = TRUE)
-
-## Number of non-zero edges (ignoring diagonal elements if necessary)
-nonzerofig1 = sum(att_net_no_diag != 0, na.rm = TRUE)
-
-# Count edges lower than 0.001
-entries_below_001 = sum(att_net_no_diag < 0.001, na.rm = TRUE)
-```
-
-```{r}
-# Figure 1 right panel (2 in the artilce)
-
-## mgm
-
-#signed matrix
-mat_mgm_att = mgm_att$pairwise$wadj*mgm_att$pairwise$signs
-
-# Remove diagonal elements (self-loops) if necessary
-mat_mgm_att_no_diag = mat_mgm_att
-diag(mat_mgm_att_no_diag) <- NA
-
-## Min edge weight (excluding diagonal elements)
-min_fig1 = mat_mgm_att_no_diag %>% 
-  as.vector() %>%
-  min(na.rm = TRUE)
-
-## Max edge weight (excluding diagonal elements and edge weight of 1)
-max_fig1 = mat_mgm_att_no_diag %>% 
-  as.vector()
-max_fig1 = max_fig1[!is.na(max_fig1) & max_fig1 != 1]
-max_fig1 = max(max_fig1, na.rm = TRUE)
-
-## Node strength (using the original matrix if diagonals are meaningful)
-strength_fig1 = centrality(mgm_att$pairwise$wadj)
-
-## Constraint (using the full matrix)
-const_fig1 = mean(abs(mgm_att$pairwise$wadj[!is.na(mgm_att$pairwise$wadj) & mgm_att$pairwise$wadj != 0]))
-
-## Number of non-zero edges (ignoring diagonal elements if necessary)
-zerofig1 = (sum(is.na(mgm_att$pairwise$signs)) - 19) / 2
-
-# Count edges lower than 0.001
-entries_no0 = sum(mgm_att$pairwise$wadj != 0, na.rm = TRUE)
+print(mean_constraint_values)
 ```
 
 
 ```{r}
-# Figure 2 (3 in the article)
+# Figure 2
 
-# Function to calculate and print the mean and bootstrapped CIs
-print_summary_stats <- function(df_l, df_m = NULL, df_h, df_l_pc, df_m_pc = NULL, df_h_pc) {
-  if (!is.null(df_m)) {
-    pint <- c(rep("Low", 10000), rep("Medium", 10000), rep("High", 10000))
-    const_val <- c(df_l, df_m, df_h, df_l_pc, df_m_pc, df_h_pc)
-    data_type <- rep(c("Correlational network", "mgm"), each = 30000)
-    pint_vector <- rep(pint, 2)
-  } else {
-    pint <- c(rep("Low", 10000), rep("High", 10000))
-    const_val <- c(df_l, df_h, df_l_pc, df_h_pc)
-    data_type <- rep(c("Correlational network", "mgm"), each = 20000)
-    pint_vector <- rep(pint, 2)
-  }
-  
-  mcon_data <- data.frame(
-    const_val = const_val,
-    pint = pint_vector,
-    data_type = data_type
-  )
-  
-  # Calculate summary statistics
-  mcon_data_summary <- mcon_data %>%
-    group_by(pint, data_type) %>%
-    summarise(
-      mean_val = mean(const_val),
-      ci_lower = quantile(const_val, 0.025),
-      ci_upper = quantile(const_val, 0.975)
-    )
-  
-  # Print the summary
-  print(mcon_data_summary)
+## ASPL
+compute_aspl <- function(adj_matrix) {
+  abs_matrix <- abs(adj_matrix)  # Ensure all values are non-negative
+  aspl <- tryCatch({
+    pathlengths(abs_matrix, weighted = TRUE)$ASPL  # Compute ASPL
+  }, error = function(e) {
+    return(NA)  # If error, return NA
+  })
+  return(aspl)
 }
 
-# print desc
-print_summary_stats(cons_pint_l, cons_pint_m, cons_pint_h, cons_pint_l_pc, cons_pint_m_pc, cons_pint_h_pc)
+# Compute ASPL for each network
+aspl_pint_low <- compute_aspl(mgm_models[["pol_int_low"]][["pairwise"]][["wadj"]])
+aspl_pint_high <- compute_aspl(mgm_models[["pol_int_high"]][["pairwise"]][["wadj"]])
+aspl_educ_low <- compute_aspl(mgm_models[["educ_low"]][["pairwise"]][["wadj"]])
+aspl_educ_high <- compute_aspl(mgm_models[["educ_high"]][["pairwise"]][["wadj"]])
 
-# for two levels df:
-print_descriptives <- function(cons_pint_h_2_2, cons_pint_h_2_2_pc, cons_pint_l_2_2, cons_pint_l_2_2_pc) {
-  # Combine the data
-  cons_data <- data.frame(
-    const_val = c(cons_pint_h_2_2, cons_pint_h_2_2_pc, cons_pint_l_2_2, cons_pint_l_2_2_pc),
-    group = rep(c("cons_pint_h_2_2", "cons_pint_h_2_2_pc", "cons_pint_l_2_2", "cons_pint_l_2_2_pc"), 
-                each = length(cons_pint_h_2_2))
-  )
+# Store results in a dataframe
+aspl_values <- data.frame(
+  Network = c("Political Interest - Low", "Political Interest - High", "Education - Low", "Education - High"),
+  ASPL = c(aspl_pint_low, aspl_pint_high, aspl_educ_low, aspl_educ_high)
+)
+
+# Print results
+print(aspl_values)
+```
+
+
+```{r}
+# Figure 2
+
+## R2
+find_strongest_weakest_edges <- function(adj_matrix, shortnames) {
+  # Convert matrix to a dataframe for easier sorting
+  edge_df <- as.data.frame(as.table(adj_matrix))
+  colnames(edge_df) <- c("Node1", "Node2", "Weight")
   
-  # Calculate summary statistics
-  cons_data_summary <- cons_data %>%
-    group_by(group) %>%
-    summarise(
-      mean_val = mean(const_val),
-      sd_val = sd(const_val),
-      min_val = min(const_val),
-      max_val = max(const_val),
-      ci_lower = quantile(const_val, 0.025),
-      ci_upper = quantile(const_val, 0.975)
-    )
+  # Remove self-loops and zero edges
+  edge_df <- edge_df[edge_df$Node1 != edge_df$Node2 & edge_df$Weight != 0, ]
   
-  # Print the summary
-  print(cons_data_summary)
+  # Sort by absolute weight to get strongest/weakest edges
+  strongest_edges <- edge_df[base::order(-abs(edge_df$Weight)), ][1:2, ]
+  weakest_edges <- edge_df[base::order(abs(edge_df$Weight)), ][1:2, ]
+  
+  # Convert node indexes to names
+  strongest_edges$Node1 <- shortnames[strongest_edges$Node1]
+  strongest_edges$Node2 <- shortnames[strongest_edges$Node2]
+  weakest_edges$Node1 <- shortnames[weakest_edges$Node1]
+  weakest_edges$Node2 <- shortnames[weakest_edges$Node2]
+  
+  return(list(Strongest = strongest_edges, Weakest = weakest_edges))
 }
 
-# Example usage (assuming cons_pint_h_2_2, cons_pint_h_2_2_pc, cons_pint_l_2_2, and cons_pint_l_2_2_pc are defined)
-print_descriptives(cons_pint_h_2_2, cons_pint_h_2_2_pc, cons_pint_l_2_2, cons_pint_l_2_2_pc)
+# Apply function to each network
+strongest_weakest_pint_low <- find_strongest_weakest_edges(mgm_models[["pol_int_low"]][["pairwise"]][["wadj"]], shortnames)
+strongest_weakest_pint_high <- find_strongest_weakest_edges(mgm_models[["pol_int_high"]][["pairwise"]][["wadj"]], shortnames)
+strongest_weakest_educ_low <- find_strongest_weakest_edges(mgm_models[["educ_low"]][["pairwise"]][["wadj"]], shortnames)
+strongest_weakest_educ_high <- find_strongest_weakest_edges(mgm_models[["educ_high"]][["pairwise"]][["wadj"]], shortnames)
 
+# Print results
+print("Strongest & Weakest edges for Political Interest - Low")
+print(strongest_weakest_pint_low)
+
+print("Strongest & Weakest edges for Political Interest - High")
+print(strongest_weakest_pint_high)
+
+print("Strongest & Weakest edges for Education - Low")
+print(strongest_weakest_educ_low)
+
+print("Strongest & Weakest edges for Education - High")
+print(strongest_weakest_educ_high)
 ```
 
 ```{r}
-# Figure 3 (4 in the article): ASPL
-# Function to print descriptive statistics for ASPL values
-print_aspl_descriptives <- function(aspl_data) {
-  aspl_values <- aspl_data$aspl_values
+# Figure 2
+
+## r2
+r2_df <- data.frame(
+  Variable = shortnames,
+  pol_int_low = c(0.52, 0.26, 0.53, 0.58, 0.00, 0.61, 0.54, 0.14, 0.42, 0.53, 0.26, 0.17, 0.29, 0.39, 0.15, 0.29, 0.13, 0.00, 0.08),
+  pol_int_high = c(0.62, 0.33, 0.56, 0.67, 0.20, 0.70, 0.63, 0.30, 0.31, 0.64, 0.43, 0.40, 0.39, 0.44, 0.23, 0.55, 0.22, 0.20, 0.14),
+  educ_low = c(0.60, 0.32, 0.51, 0.68, 0.19, 0.65, 0.60, 0.25, 0.31, 0.62, 0.39, 0.30, 0.35, 0.40, 0.19, 0.53, 0.23, 0.17, 0.15),
+  educ_high = c(0.55, 0.25, 0.56, 0.61, 0.09, 0.70, 0.64, 0.32, 0.33, 0.62, 0.37, 0.40, 0.40, 0.42, 0.25, 0.49, 0.18, 0.09, 0.13)
+)
+
+find_extreme_r2 <- function(r2_column, network_name) {
+  max_var <- r2_df$Variable[which.max(r2_column)]
+  min_var <- r2_df$Variable[which.min(r2_column)]
+  max_r2 <- max(r2_column)
+  min_r2 <- min(r2_column)
   
-  # Calculate the mean, standard deviation, quartiles, and bootstrapped confidence intervals
-  mean_val <- mean(aspl_values, na.rm = TRUE)
-  sd_val <- sd(aspl_values, na.rm = TRUE)
-  quartiles <- quantile(aspl_values, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
-  ci_lower <- quantile(aspl_values, 0.025, na.rm = TRUE)
-  ci_upper <- quantile(aspl_values, 0.975, na.rm = TRUE)
-  
-  # Print the results
-  cat("Descriptive Statistics for ASPL:\n")
-  cat("Mean:", mean_val, "\n")
-  cat("Standard Deviation:", sd_val, "\n")
-  cat("25th Percentile (Q1):", quartiles[1], "\n")
-  cat("50th Percentile (Median):", quartiles[2], "\n")
-  cat("75th Percentile (Q3):", quartiles[3], "\n")
-  cat("Lower 95% CI:", ci_lower, "\n")
-  cat("Upper 95% CI:", ci_upper, "\n")
+  cat("\n", network_name, "\n")
+  cat("Highest R²:", max_var, "=", round(max_r2, 3), "\n")
+  cat("Lowest R²:", min_var, "=", round(min_r2, 3), "\n")
 }
 
-# print desc
-print_aspl_descriptives(aspl_pint_l_2_2_pc)
-print_aspl_descriptives(aspl_pint_h_2_2_pc)
-print_aspl_descriptives(aspl_educ_l_pc)
-print_aspl_descriptives(aspl_educ_h_pc)
-
+# Extract min & max R² per network
+find_extreme_r2(r2_df$pol_int_low, "Political Interest - Low")
+find_extreme_r2(r2_df$pol_int_high, "Political Interest - High")
+find_extreme_r2(r2_df$educ_low, "Education - Low")
+find_extreme_r2(r2_df$educ_high, "Education - High")
 ```
 
 ```{r}
-# Figure 3 (4 in the article): R2 sums
-# Function to print descriptive statistics for R² values
-print_r2_descriptives <- function(r2_data) {
-  r2_values <- r2_data$r2_values
-  
-  # Calculate the mean, standard deviation, quartiles, and bootstrapped confidence intervals
-  mean_val <- mean(r2_values, na.rm = TRUE)
-  sd_val <- sd(r2_values, na.rm = TRUE)
-  quartiles <- quantile(r2_values, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
-  ci_lower <- quantile(r2_values, 0.025, na.rm = TRUE)
-  ci_upper <- quantile(r2_values, 0.975, na.rm = TRUE)
-  
-  # Print the results
-  cat("Descriptive Statistics for R²:\n")
-  cat("Mean:", mean_val, "\n")
-  cat("Standard Deviation:", sd_val, "\n")
-  cat("25th Percentile (Q1):", quartiles[1], "\n")
-  cat("50th Percentile (Median):", quartiles[2], "\n")
-  cat("75th Percentile (Q3):", quartiles[3], "\n")
-  cat("Lower 95% CI:", ci_lower, "\n")
-  cat("Upper 95% CI:", ci_upper, "\n")
+# Figure 2
+
+## Denisty
+## Function to retain the upper triangle of an adjacency matrix
+retain_upper_matrix <- function(adj_matrix) {
+  upper_mat <- adj_matrix
+  upper_mat[lower.tri(upper_mat, diag = TRUE)] <- 0  # Set lower triangle and diagonal to 0
+  return(upper_mat)
 }
 
-# Example usage with your R² objects
-print_r2_descriptives(r2_pint_l_2_1_pc)
-print_r2_descriptives(r2_pint_h_2_1_pc)
-print_r2_descriptives(r2_educ_l_pc)
-print_r2_descriptives(r2_educ_h_pc)
+## Function to compute the theoretical maximum number of edges
+compute_max_edges <- function(adj_matrix) {
+  n_nodes <- ncol(adj_matrix)  # Get number of nodes (columns = rows in square matrix)
+  return((n_nodes * (n_nodes - 1)) / 2)  # Formula for max edges in undirected network
+}
+
+## Function to count non-zero edges in the upper triangle of a matrix
+count_nonzero_edges <- function(adj_matrix) {
+  upper_mat <- retain_upper_matrix(adj_matrix)  # Retain only upper triangle
+  return(sum(upper_mat != 0))  # Count non-zero values
+}
+
+# Compute for each network
+networks <- c("pol_int_low", "pol_int_high", "educ_low", "educ_high")
+
+results <- data.frame(
+  Network = character(),
+  Max_Edges = numeric(),
+  Nonzero_Edges = numeric()
+)
+
+for (net in networks) {
+  adj_matrix <- mgm_models[[net]][["pairwise"]][["wadj"]]  # Extract adjacency matrix
+  
+  max_edges <- compute_max_edges(adj_matrix)  # Compute theoretical max edges
+  nonzero_edges <- count_nonzero_edges(adj_matrix)  # Count nonzero edges
+  
+  results <- rbind(results, data.frame(
+    Network = net,
+    Max_Edges = max_edges,
+    Nonzero_Edges = nonzero_edges
+  ))
+}
+
+# Print results
+print(results)
+
+
 ```
+
 
 ```{r}
 #Figure 4

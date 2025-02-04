@@ -1,0 +1,171 @@
+---
+title: "data_vis"
+author: "Arturo Bertero"
+date: "2024-01-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(MASS)
+library(ggplot2)
+library(dplyr)
+library(here)
+library(patchwork)
+library(hrbrthemes)
+```
+
+# Constraint versus not-constrained
+
+```{r}
+Min_wage <- runif(1000, min = 0, max = 10)
+Adopt <- runif(1000, min = 0, max = 10)
+
+# Create a dataframe with the generated variables
+df <- data.frame(Min_wage, Adopt)
+
+# Create a scatterplot of PTV_PD vs. Big_gov
+plot_1 <- ggplot(df, aes(x = Min_wage, y = Adopt)) +
+  geom_point(size = 0.5) +
+  labs(x = "Support for minimum wage", 
+       y = "Support for adoption of homosexual couples", 
+       title = "Low Constraint") +
+  scale_x_continuous(breaks = c(2, 4, 6, 8, 10)) +
+  scale_y_continuous(breaks = c(2, 4, 6, 8, 10)) +
+  theme_ipsum(base_size = 14) +  # Applying theme_ipsum and adjusting base text size for readability
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_text(size = 14),  # Adjusting axis title size
+    axis.text = element_text(size = 12)    # Adjusting axis label size
+  )
+```
+
+```{r}
+# Set the desired correlation coefficient
+desired_correlation <- 0.45
+
+# Create a random sample of data with the specified correlation
+set.seed(123)  # Set a seed for reproducibility
+n <- 1000
+mean_vector <- c(5, 5)  # Mean values for Min_wage and Adopt
+cor_matrix <- matrix(c(1, desired_correlation, desired_correlation, 1), nrow = 2)  # Covariance matrix
+data_matrix <- MASS::mvrnorm(n, mu = mean_vector, Sigma = cor_matrix)
+
+# Create a dataframe with the generated variables
+df <- data.frame(Min_wage = data_matrix[, 1], Adopt = data_matrix[, 2])
+
+# Create a scatterplot of Min_wage vs. Adopt
+plot_2 <- ggplot(df, aes(x = Min_wage, y = Adopt)) +
+  geom_point(size = 0.5) +
+  labs(x = "Support for minimum wage", 
+       y = "Support for adoption of homosexual couples",
+       title = "High Constraint") +
+  scale_x_continuous(breaks = c(2, 4, 6, 8, 10)) +
+  scale_y_continuous(breaks = c(2, 4, 6, 8, 10)) +
+  theme_ipsum(base_size = 14) +  # Applying theme_ipsum and adjusting base text size for readability
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_text(size = 14),  # Adjusting axis title size
+    axis.text = element_text(size = 12)    # Adjusting axis label size
+  )
+```
+
+```{r}
+# Adjust the overall size to fit half a Word page width
+plottt = plot_1 + plot_spacer() + plot_2 + plot_layout(widths = c(4, 0.5, 4))
+
+# Save the combined plot with appropriate size (scaled to fit half of a Word page width)
+ggsave(here("data_vis", "const.jpg"), plottt, width = 6.5, height = 6.5, dpi = 300)
+```
+
+
+# 4 panels
+
+```{r}
+# Function to generate data
+generate_data <- function(n, mean1, mean2, cor_target_0, cor_target_1) {
+  sigma_0 <- matrix(c(1, cor_target_0, cor_target_0, 1), nrow = 2)
+  data_cor_0 <- mvrnorm(n, mu = c(mean1, mean2), Sigma = sigma_0)
+  data_cor_0 <- pmax(pmin(data_cor_0, 10), 0)
+  
+  sigma_1 <- matrix(c(1, cor_target_1, cor_target_1, 1), nrow = 2)
+  data_cor_1 <- mvrnorm(n, mu = c(mean1, mean2), Sigma = sigma_1)
+  data_cor_1 <- pmax(pmin(data_cor_1, 10), 0)
+  
+  Variable3 <- sample(0:1, n, replace = TRUE)
+  data <- data.frame(
+    Min_wage = ifelse(Variable3 == 0, data_cor_0[, 1], data_cor_1[, 1]),
+    Adopt = ifelse(Variable3 == 0, data_cor_0[, 2], data_cor_1[, 2]),
+    Relig = Variable3
+  )
+  return(data)
+}
+
+# Function to create scatterplots
+create_scatterplot <- function(data, title_text, cor_default, cor_relig0, cor_relig1) {
+  ggplot(data, aes(x = Min_wage, y = Adopt, color = factor(Relig))) +
+    geom_point(size = 0.3, alpha = 0.6) +
+    geom_smooth(method = lm, se = TRUE, color = "#5b5b5b", aes(group = 1)) +
+    geom_smooth(data = subset(data, Relig == 0), method = lm, se = TRUE, color = "#966FD6B3", aes(group = 2)) +
+    geom_smooth(data = subset(data, Relig == 1), method = lm, se = TRUE, color = "#008B8BB3", aes(group = 3)) +
+    labs(x = "Support for minimum wage", y = "Support for adoption of homosexual couples", title = title_text) +
+    scale_color_manual(values = c("0" = "#966FD6B3", "1" = "#008B8BB3"), 
+                       labels = c("0" = "Party 1", "1" = "Party 2"), 
+                       name = "Religious") +  # Fix legend title
+    theme_ipsum() +
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),
+      axis.title = element_text(size = 14),
+      axis.text = element_text(size = 12),
+      legend.position = "bottom",
+      plot.margin = margin(10, 10, 30, 10, "pt")  # Reduce empty space
+    ) +
+    annotate("text",
+             x = min(data$Min_wage) + 1,  
+             y = min(data$Adopt) - 1,  
+             label = sprintf("overall r = %.2f\nr for voters of Party 1 = %.2f\nr for voters of Party 2 = %.2f", 
+                             cor_default, cor_relig0, cor_relig1),
+             vjust = 0, hjust = 0, size = 3.5)
+}
+
+# Generate data (Adjusted `data_low_low` for more distinct slopes)
+data_high_low <- generate_data(1000, 5, 5, 0.65, -0.65)
+data_low_low <- generate_data(1000, 5, 5, 0.35, -0.20)  
+data_high_high <- generate_data(1000, 5, 5, 0.65, 0.65)
+data_low_high <- generate_data(1000, 5, 5, 0.15, 0.10)
+
+compute_correlations <- function(data) {
+  list(
+    cor_default = cor(data$Min_wage, data$Adopt),
+    cor_relig0 = cor(subset(data, Relig == 0)$Min_wage, subset(data, Relig == 0)$Adopt),
+    cor_relig1 = cor(subset(data, Relig == 1)$Min_wage, subset(data, Relig == 1)$Adopt)
+  )
+}
+
+cor_high_low <- compute_correlations(data_high_low)
+cor_low_low <- compute_correlations(data_low_low)
+cor_high_high <- compute_correlations(data_high_high)
+cor_low_high <- compute_correlations(data_low_high)
+
+# Create plots
+plot_high_low <- create_scatterplot(data_high_low, "High tightness, low consensus", cor_high_low$cor_default, cor_high_low$cor_relig0, cor_high_low$cor_relig1)
+plot_low_low <- create_scatterplot(data_low_low, "Low tightness, low consensus", cor_low_low$cor_default, cor_low_low$cor_relig0, cor_low_low$cor_relig1)
+plot_high_high <- create_scatterplot(data_high_high, "High tightness, high consensus", cor_high_high$cor_default, cor_high_high$cor_relig0, cor_high_high$cor_relig1)
+plot_low_high <- create_scatterplot(data_low_high, "Low tightness, high consensus", cor_low_high$cor_default, cor_low_high$cor_relig0, cor_low_high$cor_relig1)
+
+# Assemble all plots using patchwork (collecting only the legend)
+final_plot <- (plot_high_low | plot_low_low) / (plot_high_high | plot_low_high) +
+  plot_layout(guides = "collect", heights = c(1, 1)) &  # Collect only the legend and reduce space
+  theme(legend.position = "bottom")  # Keep only one legend at the bottom
+
+# Save final plot
+ggsave(here("data_vis", "tightness_consensus.jpg"), final_plot, width = 8.5, height = 12, dpi = 300)
+```
+
+
+
+
+
+
+
