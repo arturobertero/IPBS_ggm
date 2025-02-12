@@ -1568,7 +1568,7 @@ find_extreme_r2(r2_df$educ_high, "Education - High")
 ```
 
 ```{r}
-# Figure 2
+# Figure 3
 
 ## Denisty
 ## Function to retain the upper triangle of an adjacency matrix
@@ -1620,7 +1620,7 @@ print(results)
 
 
 ```{r}
-#Figure 4
+#Figure 5
 
 #signed mat
 mat_signed_left = cond0$pairwise$wadj*cond0$pairwise$signs
