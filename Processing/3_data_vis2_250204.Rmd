@@ -49,7 +49,7 @@ desired_correlation <- 0.45
 set.seed(123)  # Set a seed for reproducibility
 n <- 1000
 mean_vector <- c(5, 5)  # Mean values for Min_wage and Adopt
-cor_matrix <- matrix(c(1, desired_correlation, desired_correlation, 1), nrow = 2)  # Covariance matrix
+cor_matrix <- matrix(c(1, desired_correlation, desired_correlation, 1), nrow = 2)  
 data_matrix <- MASS::mvrnorm(n, mu = mean_vector, Sigma = cor_matrix)
 
 # Create a dataframe with the generated variables
@@ -63,19 +63,19 @@ plot_2 <- ggplot(df, aes(x = Min_wage, y = Adopt)) +
        title = "High Constraint") +
   scale_x_continuous(breaks = c(2, 4, 6, 8, 10)) +
   scale_y_continuous(breaks = c(2, 4, 6, 8, 10)) +
-  theme_ipsum(base_size = 14) +  # Applying theme_ipsum and adjusting base text size for readability
+  theme_ipsum(base_size = 14) +  
   theme(
     plot.title = element_text(size = 16, face = "bold"),
-    axis.title = element_text(size = 14),  # Adjusting axis title size
-    axis.text = element_text(size = 12)    # Adjusting axis label size
+    axis.title = element_text(size = 14),  
+    axis.text = element_text(size = 12)    
   )
 ```
 
 ```{r}
-# Adjust the overall size to fit half a Word page width
+# Adjust the overall size 
 plottt = plot_1 + plot_spacer() + plot_2 + plot_layout(widths = c(4, 0.5, 4))
 
-# Save the combined plot with appropriate size (scaled to fit half of a Word page width)
+# Save the combined plot with appropriate size 
 ggsave(here("data_vis", "const.jpg"), plottt, width = 6.5, height = 6.5, dpi = 300)
 ```
 
@@ -112,14 +112,14 @@ create_scatterplot <- function(data, title_text, cor_default, cor_relig0, cor_re
     labs(x = "Support for minimum wage", y = "Support for adoption of homosexual couples", title = title_text) +
     scale_color_manual(values = c("0" = "#966FD6B3", "1" = "#008B8BB3"), 
                        labels = c("0" = "Party 1", "1" = "Party 2"), 
-                       name = "Religious") +  # Fix legend title
+                       name = "Religious") + 
     theme_ipsum() +
     theme(
       plot.title = element_text(size = 16, face = "bold"),
       axis.title = element_text(size = 14),
       axis.text = element_text(size = 12),
       legend.position = "bottom",
-      plot.margin = margin(10, 10, 30, 10, "pt")  # Reduce empty space
+      plot.margin = margin(10, 10, 30, 10, "pt")  
     ) +
     annotate("text",
              x = min(data$Min_wage) + 1,  
@@ -154,10 +154,10 @@ plot_low_low <- create_scatterplot(data_low_low, "Low tightness, low consensus",
 plot_high_high <- create_scatterplot(data_high_high, "High tightness, high consensus", cor_high_high$cor_default, cor_high_high$cor_relig0, cor_high_high$cor_relig1)
 plot_low_high <- create_scatterplot(data_low_high, "Low tightness, high consensus", cor_low_high$cor_default, cor_low_high$cor_relig0, cor_low_high$cor_relig1)
 
-# Assemble all plots using patchwork (collecting only the legend)
+# Assemble all plots using patchwork 
 final_plot <- (plot_high_low | plot_low_low) / (plot_high_high | plot_low_high) +
-  plot_layout(guides = "collect", heights = c(1, 1)) &  # Collect only the legend and reduce space
-  theme(legend.position = "bottom")  # Keep only one legend at the bottom
+  plot_layout(guides = "collect", heights = c(1, 1)) &  
+  theme(legend.position = "bottom")  
 
 # Save final plot
 ggsave(here("data_vis", "tightness_consensus.jpg"), final_plot, width = 8.5, height = 12, dpi = 300)
