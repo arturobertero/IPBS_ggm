@@ -963,7 +963,7 @@ Graph_cond_2 <- qgraph(cond2$pairwise$wadj)
 
 # Multiplot for Left and Right only
 jpeg(here("Output", "Article", "Figure_3.jpg"), 
-     height = 8000, width = 8000, quality = 1000)  # Adjust image size as needed
+     height = 3508, width = 2480, quality = 100)  
 
 # Create a common layout based on the two conditions
 L <- averageLayout(Graph_cond_0, Graph_cond_1, Graph_cond_2, layout = "spring")
