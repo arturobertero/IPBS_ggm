@@ -743,6 +743,7 @@ facet_r2_plot <- create_facet_plot(plot_data)
 
 # Save
 ggsave(here("Output", "Article", "Figure_2.jpg"), facet_r2_plot, , width = 12, height = 12, dpi = 300)
+ggsave(here("Output", "Article", "Figure_2_w.jpg"), facet_r2_plot, , width = 16, height = 9, dpi = 300)
 ```
 
 ## Tables
@@ -1013,8 +1014,62 @@ Graph_cond_2 <- qgraph(
 
 # Finish and save the plot
 dev.off()
-mnm_vote$interactions[2]
 
+```
+
+```{r}
+# Multiplot for Left and Right only
+jpeg(here("Output", "Article", "Figure_3_w.jpg"), 
+     width = 3840, height = 2160, quality = 100)  
+
+# Create a common layout based on the two conditions
+L <- averageLayout(Graph_cond_0, Graph_cond_1, Graph_cond_2, layout = "spring")
+
+# Matrix layout for the graphs (1 row, 2 columns)
+lmat <- matrix(1:3, 1, 3)
+
+# Start plotting
+layout(lmat, width = c(1, 1, 1))
+
+# Generate plots for Left (Sin)
+set.seed(1)
+Graph_cond_0 <- qgraph(
+  cond0$pairwise$wadj, layout = L, fade = TRUE,  # Enable edge fading
+  labels = shortnames, vTrans = 255,  # Transparency setting
+  groups = Totalgroup_comm,  
+  color = Totalgroup_cols,  
+  legend = FALSE, title = "Left", title.cex = 12,
+  edge.color = cond0$pairwise$edgecolor_cb,  # Ensure edge colors reflect the weights
+  borders = TRUE, vsize = 10, esize = 15, 
+  theme = "colorblind"  # Explicit alpha control to help edge fading  # Consistent scaling across plots
+)
+
+# Generate plots for Right (Dx)
+set.seed(1)
+Graph_cond_1 <- qgraph(
+  cond1$pairwise$wadj, layout = L, fade = TRUE,  # Enable edge fading
+  labels = shortnames,  
+  groups = Totalgroup_comm, 
+  color = Totalgroup_cols, 
+  legend = FALSE, title = "M5S", title.cex = 12,
+  edge.color = cond1$pairwise$edgecolor_cb,  # Ensure edge colors reflect the weights
+  borders = TRUE, vsize = 10, esize = 15,   # Use edge.alpha to control transparency based on edge weight  # Set a lower cut-off threshold
+  theme = "colorblind"  # Explicit alpha control to help edge fading  # Consistent scaling across plots
+)
+
+Graph_cond_2 <- qgraph(
+  cond2$pairwise$wadj, layout = L, fade = TRUE,  # Enable edge fading
+  labels = shortnames,  
+  groups = Totalgroup_comm, 
+  color = Totalgroup_cols, 
+  legend = FALSE, title = "Right", title.cex = 12,
+  edge.color = cond2$pairwise$edgecolor_cb,  # Ensure edge colors reflect the weights
+  borders = TRUE, vsize = 10, esize = 15, 
+  theme = "colorblind"  # Explicit alpha control to help edge fading  # Consistent scaling across plots
+)
+
+# Finish and save the plot
+dev.off()
 ```
 
 
